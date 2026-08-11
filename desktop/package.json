@@ -35,6 +35,13 @@
       "createDesktopShortcut": true,
       "shortcutName": "Scadenzario"
     },
-    "publish": [{ "provider": "github", "owner": "Alessiortuso", "repo": "scadenzario" }]
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Alessiortuso",
+        "repo": "scadenzario",
+        "releaseType": "release"
+      }
+    ]
   }
 }
