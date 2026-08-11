@@ -1,0 +1,31 @@
+# Python
+backend/.venv/
+__pycache__/
+*.py[cod]
+
+# Database locale
+*.db
+*.db-wal
+*.db-shm
+
+# Configurazione con chiavi e credenziali
+backend/.env
+
+# Node / Angular
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+
+# Electron
+desktop/node_modules/
+desktop/release/
+
+# Pacchetto backend
+backend/build/
+backend/dist/
+
+# Editor / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

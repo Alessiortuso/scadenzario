@@ -1,0 +1,64 @@
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.1rem;
+}
+.page-head p {
+  margin: 0;
+}
+
+.filters {
+  margin-bottom: 1rem;
+}
+.field.grow {
+  flex: 1 1 240px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.badge-neutral {
+  margin-left: 0.4rem;
+}
+
+.row-overdue td:first-child {
+  box-shadow: inset 3px 0 0 var(--danger);
+}
+
+.actions {
+  display: flex;
+  gap: 0.35rem;
+  justify-content: flex-end;
+}
+
+.sort {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-transform: inherit;
+  letter-spacing: inherit;
+}
+.sort:hover {
+  color: var(--primary);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  padding-top: 0.9rem;
+}

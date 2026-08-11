@@ -1,0 +1,242 @@
+<header class="page-head">
+  <div>
+    <h1>Impostazioni</h1>
+    <p class="muted">Canali di notifica, preavvisi e categorie.</p>
+  </div>
+  <div class="head-actions">
+    <a class="btn btn-sm" routerLink="/configurazione">Collegamento al database</a>
+    <button class="btn btn-sm" type="button" (click)="runNow()">Esegui ciclo avvisi adesso</button>
+  </div>
+</header>
+
+@if (settings(); as s) {
+  <div class="card">
+    <h2>Canali di notifica</h2>
+    <div class="channels">
+      <label class="switch">
+        <input type="checkbox" [checked]="s.channel_inapp" (change)="patch('channel_inapp', $any($event.target).checked)" />
+        <span>
+          <strong>Centro notifiche</strong>
+          <span class="small muted block">Avvisi visibili nella campanella in alto.</span>
+        </span>
+      </label>
+
+      <label class="switch" [class.disabled]="!s.push_configured">
+        <input
+          type="checkbox"
+          [checked]="s.channel_push"
+          [disabled]="!s.push_configured"
+          (change)="patch('channel_push', $any($event.target).checked)"
+        />
+        <span>
+          <strong>Notifiche desktop (Web Push)</strong>
+          <span class="small muted block">
+            {{ s.push_configured ? 'Arrivano anche a sito chiuso, finché il browser è in esecuzione.' : 'Chiavi VAPID non configurate nel file .env del backend.' }}
+          </span>
+        </span>
+      </label>
+
+      <label class="switch" [class.disabled]="!s.email_configured">
+        <input
+          type="checkbox"
+          [checked]="s.channel_email"
+          [disabled]="!s.email_configured"
+          (change)="patch('channel_email', $any($event.target).checked)"
+        />
+        <span>
+          <strong>Email</strong>
+          <span class="small muted block">
+            {{ s.email_configured ? 'Invio SMTP configurato.' : 'SMTP non configurato nel file .env del backend.' }}
+          </span>
+        </span>
+      </label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Quando avvisare</h2>
+    <div class="grid-2">
+      <div class="field">
+        <label for="offsets">Preavvisi predefiniti (giorni prima)</label>
+        <input id="offsets" [(ngModel)]="offsetsText" placeholder="30, 15, 7, 3, 1, 0" />
+        <span class="small muted">Usati quando la scadenza e la categoria non ne definiscono di propri.</span>
+      </div>
+
+      <div class="field">
+        <label for="time">Orario di invio</label>
+        <input id="time" type="time" [value]="s.daily_send_time" (change)="patch('daily_send_time', $any($event.target).value)" />
+        <span class="small muted">Fuso orario del server: {{ s.timezone }}</span>
+      </div>
+
+      <div class="field">
+        <label for="repeat">Sollecito dopo la scadenza (ogni N giorni)</label>
+        <input
+          id="repeat"
+          type="number"
+          min="0"
+          [value]="s.overdue_repeat_days"
+          (change)="patch('overdue_repeat_days', +$any($event.target).value)"
+        />
+        <span class="small muted">0 per non sollecitare.</span>
+      </div>
+
+      <div class="field">
+        <label for="maxrem">Numero massimo di solleciti</label>
+        <input
+          id="maxrem"
+          type="number"
+          min="0"
+          [value]="s.overdue_max_reminders"
+          (change)="patch('overdue_max_reminders', +$any($event.target).value)"
+        />
+      </div>
+
+      <div class="field span-2">
+        <label for="emails">Email destinatarie (predefinite)</label>
+        <input id="emails" [(ngModel)]="emailsText" placeholder="amministrazione@azienda.it, titolare@azienda.it" />
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-primary" type="button" (click)="save()" [disabled]="saving()">
+        {{ saving() ? 'Salvataggio…' : 'Salva impostazioni' }}
+      </button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2>Notifiche desktop su questo dispositivo</h2>
+      <span
+        class="badge"
+        [class]="push.state() === 'on' || push.state() === 'native' ? 'badge badge-success' : 'badge badge-neutral'"
+      >
+        {{ pushLabel() }}
+      </span>
+    </div>
+
+    @if (push.state() === 'native') {
+      <p class="small muted">
+        Stai usando l'applicazione desktop: gli avvisi compaiono come notifiche di Windows anche a finestra chiusa,
+        finché il programma resta nella barra delle applicazioni. Chiudendo del tutto il programma gli avvisi
+        arretrati vengono mostrati al successivo avvio.
+      </p>
+    } @else {
+      <p class="small muted">
+        Le notifiche desktop vengono consegnate dal service worker del browser: compaiono anche quando il sito non è
+        aperto in nessuna scheda. Perché arrivino a browser completamente chiuso serve invece l'applicazione desktop
+        oppure il canale email.
+      </p>
+    }
+
+    <div class="form-actions" [hidden]="push.state() === 'native'">
+      <button
+        class="btn"
+        type="button"
+        (click)="togglePush()"
+        [disabled]="push.state() === 'unsupported' || push.state() === 'not-configured' || push.state() === 'denied'"
+      >
+        {{ push.state() === 'on' ? 'Disattiva su questo dispositivo' : 'Attiva su questo dispositivo' }}
+      </button>
+      <button class="btn" type="button" (click)="testPush()" [disabled]="devices().length === 0">
+        Invia notifica di prova
+      </button>
+    </div>
+
+    @if (devices().length) {
+      <div class="table-wrap">
+        <table class="data">
+          <thead>
+            <tr>
+              <th>Dispositivo</th>
+              <th>Registrato</th>
+              <th>Stato</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (d of devices(); track d.id) {
+              <tr>
+                <td class="device">{{ d.label || d.endpoint }}</td>
+                <td class="nowrap">{{ d.created_at | date: 'dd/MM/yyyy HH:mm' }}</td>
+                <td>
+                  <span class="badge" [class]="d.active ? 'badge badge-success' : 'badge badge-neutral'">
+                    {{ d.active ? 'attivo' : 'scaduto' }}
+                  </span>
+                </td>
+                <td class="right">
+                  <button class="btn btn-sm btn-danger" type="button" (click)="removeDevice(d)">Rimuovi</button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="empty small">Nessun dispositivo registrato.</p>
+    }
+  </div>
+
+  <div class="card">
+    <h2>Categorie</h2>
+    <p class="small muted">Ogni categoria può avere i propri preavvisi, che prevalgono su quelli predefiniti.</p>
+
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Nome</th>
+            <th>Preavvisi</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (c of categories(); track c.id) {
+            <tr>
+              <td><span class="dot" [style.background]="c.color"></span></td>
+              <td>{{ c.name }}</td>
+              <td class="muted">{{ c.alert_offsets?.length ? c.alert_offsets?.join(', ') + ' giorni prima' : 'predefiniti' }}</td>
+              <td class="right">
+                <button class="btn btn-sm btn-danger" type="button" (click)="removeCategory(c)">Elimina</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="toolbar new-category">
+      <div class="field grow">
+        <label for="cat-name">Nuova categoria</label>
+        <input
+          id="cat-name"
+          [value]="newCategory().name"
+          (input)="newCategory.set({ name: $any($event.target).value, color: newCategory().color, offsets: newCategory().offsets })"
+          placeholder="Es. Fiscale"
+        />
+      </div>
+      <div class="field">
+        <label for="cat-color">Colore</label>
+        <input
+          id="cat-color"
+          type="color"
+          [value]="newCategory().color"
+          (input)="newCategory.set({ name: newCategory().name, color: $any($event.target).value, offsets: newCategory().offsets })"
+        />
+      </div>
+      <div class="field">
+        <label for="cat-offsets">Preavvisi</label>
+        <input
+          id="cat-offsets"
+          [value]="newCategory().offsets"
+          (input)="newCategory.set({ name: newCategory().name, color: newCategory().color, offsets: $any($event.target).value })"
+          placeholder="60, 30, 7"
+        />
+      </div>
+      <button class="btn" type="button" (click)="addCategory()">Aggiungi</button>
+    </div>
+  </div>
+} @else {
+  <p class="empty">Caricamento…</p>
+}

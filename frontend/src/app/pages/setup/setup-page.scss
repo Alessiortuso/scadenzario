@@ -1,0 +1,88 @@
+.setup {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1rem 0 3rem;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+header p {
+  margin: 0.4rem auto 0;
+  max-width: 560px;
+}
+
+.mark {
+  display: inline-grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.3rem;
+  margin-bottom: 0.7rem;
+}
+
+.card + .card {
+  margin-top: 1rem;
+}
+
+.note {
+  border-left: 4px solid var(--success);
+}
+.note p {
+  margin: 0.3rem 0 0.7rem;
+  word-break: break-all;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.9rem;
+  margin-top: 0.9rem;
+}
+
+textarea {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 0.85rem;
+  word-break: break-all;
+}
+
+.result {
+  margin: 0.9rem 0 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: 9px;
+  font-size: 0.88rem;
+}
+.result.ok {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.result.ko {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 1.1rem;
+}
+
+.disclaimer {
+  margin: 1rem 0 0;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--border);
+}
+.disclaimer code {
+  font-size: 0.85em;
+}
+
+@media (max-width: 700px) {
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}

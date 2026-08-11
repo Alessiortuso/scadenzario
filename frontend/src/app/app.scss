@@ -1,0 +1,130 @@
+.shell {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 1.1rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 0.3rem;
+}
+.brand .mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--primary);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+}
+.block {
+  display: block;
+}
+
+nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+nav a {
+  padding: 0.5rem 0.7rem;
+  border-radius: 9px;
+  color: var(--text-muted);
+  font-weight: 550;
+}
+nav a:hover {
+  background: var(--surface-2);
+  text-decoration: none;
+  color: var(--text);
+}
+nav a.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.push-box {
+  margin-top: auto;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.push-box p {
+  margin: 0;
+}
+
+/* Configurazione di primo avvio: nessuna navigazione, solo il modulo. */
+.shell.bare {
+  grid-template-columns: 1fr;
+}
+.shell.bare .sidebar,
+.shell.bare .topbar {
+  display: none;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+.spacer {
+  flex: 1;
+}
+.menu-toggle {
+  display: none;
+  font-size: 1.1rem;
+}
+
+.content {
+  padding: 1.25rem;
+  max-width: 1200px;
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+  .sidebar {
+    position: fixed;
+    z-index: 60;
+    width: 240px;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+  }
+  .menu-open .sidebar {
+    transform: none;
+  }
+  .menu-toggle {
+    display: inline-flex;
+  }
+}

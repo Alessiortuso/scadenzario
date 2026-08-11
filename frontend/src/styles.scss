@@ -1,0 +1,341 @@
+/* Scadenzario — stili globali e mini design system */
+
+:root {
+  color-scheme: light dark;
+
+  --bg: #f6f7fb;
+  --surface: #ffffff;
+  --surface-2: #f1f3f9;
+  --border: #e3e6ef;
+  --text: #171a23;
+  --text-muted: #656c80;
+  --primary: #4f46e5;
+  --primary-strong: #4338ca;
+  --primary-soft: #eef2ff;
+  --danger: #dc2626;
+  --danger-soft: #fee2e2;
+  --warning: #d97706;
+  --warning-soft: #fef3c7;
+  --success: #16a34a;
+  --success-soft: #dcfce7;
+  --info: #0284c7;
+  --info-soft: #e0f2fe;
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 8px 24px rgba(16, 24, 40, 0.06);
+  --radius: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1117;
+    --surface: #171a23;
+    --surface-2: #1e222d;
+    --border: #2a2f3d;
+    --text: #e8eaf1;
+    --text-muted: #98a0b4;
+    --primary: #818cf8;
+    --primary-strong: #a5b4fc;
+    --primary-soft: #1e1b4b;
+    --danger: #f87171;
+    --danger-soft: #3f1d1d;
+    --warning: #fbbf24;
+    --warning-soft: #3b2d10;
+    --success: #4ade80;
+    --success-soft: #14321f;
+    --info: #38bdf8;
+    --info-soft: #0c2c3f;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0 0 0.4rem;
+  line-height: 1.25;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+h1 {
+  font-size: 1.6rem;
+}
+h2 {
+  font-size: 1.15rem;
+}
+h3 {
+  font-size: 1rem;
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+.small {
+  font-size: 0.85rem;
+}
+.right {
+  text-align: right;
+}
+.nowrap {
+  white-space: nowrap;
+}
+
+/* -------------------------------------------------------------- superfici */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.1rem 1.25rem;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.7rem;
+}
+
+/* --------------------------------------------------------------- controlli */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 9px;
+  padding: 0.5rem 0.85rem;
+  font: inherit;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+.btn:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-strong);
+  border-color: var(--primary-strong);
+}
+.btn-danger {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: transparent;
+}
+.btn-danger:hover:not(:disabled) {
+  background: var(--danger-soft);
+}
+.btn-sm {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.85rem;
+}
+.btn-ghost {
+  border-color: transparent;
+  background: transparent;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.field > label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 0.5rem 0.65rem;
+  width: 100%;
+  min-width: 0;
+}
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid color-mix(in srgb, var(--primary) 45%, transparent);
+  outline-offset: 1px;
+  border-color: var(--primary);
+}
+textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+input[type='checkbox'] {
+  width: auto;
+  accent-color: var(--primary);
+}
+
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.error-text {
+  color: var(--danger);
+  font-size: 0.8rem;
+}
+
+/* ---------------------------------------------------------------- tabelle */
+.table-wrap {
+  overflow-x: auto;
+}
+
+table.data {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+table.data th {
+  text-align: left;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  font-weight: 650;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+table.data td {
+  padding: 0.6rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+table.data tbody tr:hover {
+  background: var(--surface-2);
+}
+
+/* ----------------------------------------------------------------- badge */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.badge-danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.badge-warning {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.badge-success {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.badge-info {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.badge-neutral {
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: none;
+}
+
+.empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 2.5rem 1rem;
+}
+
+/* ----------------------------------------------------------------- toast */
+.toast-stack {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 100;
+}
+.toast {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--info);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  padding: 0.7rem 0.9rem;
+  max-width: 380px;
+}
+.toast.success {
+  border-left-color: var(--success);
+}
+.toast.error {
+  border-left-color: var(--danger);
+}

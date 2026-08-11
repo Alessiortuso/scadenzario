@@ -1,0 +1,137 @@
+<header class="page-head">
+  <div>
+    <h1>Importazione scadenze</h1>
+    <p class="muted">
+      Carica un file CSV o Excel: le colonne vengono riconosciute automaticamente e puoi correggere la mappatura
+      prima di importare. Reimportando lo stesso file le scadenze vengono aggiornate, non duplicate.
+    </p>
+  </div>
+</header>
+
+<div class="card">
+  <div class="toolbar">
+    <div class="field grow">
+      <label for="file">File (.csv, .xlsx)</label>
+      <input id="file" type="file" accept=".csv,.txt,.xlsx,.xlsm" (change)="onFileSelected($event)" />
+    </div>
+    <div class="field">
+      <label for="source">Etichetta fonte</label>
+      <input id="source" [(ngModel)]="source" placeholder="es. gestionale-fatture" />
+    </div>
+    <div class="field">
+      <label for="dateFormat">Formato data (opzionale)</label>
+      <input id="dateFormat" [(ngModel)]="dateFormat" placeholder="es. %d/%m/%Y" />
+    </div>
+  </div>
+</div>
+
+@if (busy()) {
+  <p class="empty">Elaborazione in corso…</p>
+}
+
+@if (preview(); as p) {
+  <div class="card">
+    <div class="card-header">
+      <h2>Mappatura colonne</h2>
+      <span class="small muted">{{ p.total_rows }} righe nel file</span>
+    </div>
+
+    <div class="mapping">
+      @for (f of fields; track f.key) {
+        <div class="field">
+          <label [for]="'map-' + f.key">{{ f.label }}@if (f.required) { * }</label>
+          <select
+            [id]="'map-' + f.key"
+            [value]="mapping()[f.key] || ''"
+            (change)="setMapping(f.key, $any($event.target).value); refreshPreview()"
+          >
+            <option value="">— non importare —</option>
+            @for (col of p.columns; track col) {
+              <option [value]="col">{{ col }}</option>
+            }
+          </select>
+        </div>
+      }
+    </div>
+
+    <div class="form-actions">
+      <button class="btn" type="button" (click)="refreshPreview()" [disabled]="!canApply || busy()">
+        Aggiorna anteprima
+      </button>
+      <button class="btn btn-primary" type="button" (click)="apply()" [disabled]="!canApply || busy()">
+        Importa {{ p.total_rows }} righe
+      </button>
+      @if (!canApply) {
+        <span class="small error-text">Titolo e data di scadenza sono obbligatori.</span>
+      }
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Anteprima (prime {{ p.rows.length }} righe)</h2>
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr>
+            <th>#</th>
+            @if (mapping()['title']) {
+              <th>Titolo</th>
+              <th>Data</th>
+              <th>Importo</th>
+              <th>Cliente</th>
+              <th>Categoria</th>
+              <th>Esito</th>
+            } @else {
+              @for (col of p.columns; track col) {
+                <th>{{ col }}</th>
+              }
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of p.rows; track row.row) {
+            <tr [class.row-error]="row.errors.length > 0">
+              <td class="muted">{{ row.row }}</td>
+              @if (mapping()['title']) {
+                <td>{{ previewValue(row.data, 'title') }}</td>
+                <td class="nowrap">{{ previewValue(row.data, 'due_date') }}</td>
+                <td class="right">{{ previewValue(row.data, 'amount') }}</td>
+                <td>{{ previewValue(row.data, 'owner') }}</td>
+                <td>{{ previewValue(row.data, 'category') }}</td>
+                <td>
+                  @if (row.errors.length) {
+                    <span class="badge badge-danger">{{ row.errors.join('; ') }}</span>
+                  } @else {
+                    <span class="badge badge-success">ok</span>
+                  }
+                </td>
+              } @else {
+                @for (col of p.columns; track col) {
+                  <td>{{ previewValue(row.data, col) }}</td>
+                }
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+}
+
+@if (result(); as r) {
+  <div class="card">
+    <h2>Esito importazione</h2>
+    <div class="result">
+      <span class="badge badge-success">{{ r.created }} create</span>
+      <span class="badge badge-info">{{ r.updated }} aggiornate</span>
+      <span class="badge badge-neutral">{{ r.skipped }} ignorate</span>
+    </div>
+    @if (r.errors.length) {
+      <ul class="errors small">
+        @for (e of r.errors; track e) {
+          <li>{{ e }}</li>
+        }
+      </ul>
+    }
+  </div>
+}
