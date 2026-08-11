@@ -1,0 +1,83 @@
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.1rem;
+}
+.page-head p {
+  margin: 0;
+}
+.head-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.card + .card {
+  margin-top: 1rem;
+}
+
+.channels {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 0.6rem;
+}
+.switch.disabled {
+  opacity: 0.6;
+}
+.switch input {
+  margin-top: 0.25rem;
+  align-self: flex-start;
+}
+.block {
+  display: block;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.9rem;
+  margin-top: 0.6rem;
+}
+.span-2 {
+  grid-column: span 2;
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.device {
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.new-category {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+.new-category .grow {
+  flex: 1 1 220px;
+}
+.new-category input[type='color'] {
+  padding: 0.15rem;
+  height: 38px;
+}
+
+@media (max-width: 800px) {
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+  .span-2 {
+    grid-column: auto;
+  }
+}

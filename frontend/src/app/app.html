@@ -1,0 +1,62 @@
+<div class="shell" [class.menu-open]="menuOpen()" [class.bare]="bare()">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="mark">S</span>
+      <span>
+        <strong>Scadenzario</strong>
+        <span class="small muted block">avvisi e notifiche</span>
+      </span>
+    </div>
+
+    <nav (click)="menuOpen.set(false)">
+      <a routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
+      <a routerLink="/scadenze" routerLinkActive="active">Scadenze</a>
+      <a routerLink="/import" routerLinkActive="active">Importazione</a>
+      <a routerLink="/impostazioni" routerLinkActive="active">Impostazioni</a>
+    </nav>
+
+    <div class="push-box">
+      @switch (push.state()) {
+        @case ('native') {
+          <p class="small muted">Notifiche di Windows attive: arrivano anche a finestra chiusa.</p>
+        }
+        @case ('unsupported') {
+          <p class="small muted">Questo browser non supporta le notifiche desktop.</p>
+        }
+        @case ('not-configured') {
+          <p class="small muted">Web Push non configurato sul server (chiavi VAPID mancanti).</p>
+        }
+        @case ('denied') {
+          <p class="small muted">Notifiche bloccate dal browser. Sbloccale dall'icona del lucchetto.</p>
+        }
+        @default {
+          <p class="small muted">
+            {{ push.state() === 'on' ? 'Notifiche desktop attive su questo dispositivo.' : 'Ricevi gli avvisi anche a sito chiuso.' }}
+          </p>
+          <button class="btn btn-sm" type="button" (click)="togglePush()" [disabled]="push.state() === 'loading'">
+            {{ push.state() === 'on' ? 'Disattiva notifiche' : 'Attiva notifiche desktop' }}
+          </button>
+        }
+      }
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn btn-ghost menu-toggle" type="button" (click)="menuOpen.set(!menuOpen())" aria-label="Menu">☰</button>
+      <div class="spacer"></div>
+      <a class="btn btn-primary btn-sm" routerLink="/scadenze/nuova">+ Nuova scadenza</a>
+      <app-notification-bell />
+    </header>
+
+    <main class="content">
+      <router-outlet />
+    </main>
+  </div>
+</div>
+
+<div class="toast-stack">
+  @for (t of toasts.toasts(); track t.id) {
+    <div class="toast" [class]="'toast ' + t.kind" (click)="toasts.dismiss(t.id)">{{ t.text }}</div>
+  }
+</div>

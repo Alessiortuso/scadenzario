@@ -1,0 +1,117 @@
+<header class="page-head">
+  <div>
+    <h1>Scadenze</h1>
+    <p class="muted">{{ total() }} risultati</p>
+  </div>
+  <a class="btn btn-primary" routerLink="/scadenze/nuova">+ Nuova scadenza</a>
+</header>
+
+<div class="card filters">
+  <div class="toolbar">
+    <div class="field grow">
+      <label for="q">Ricerca</label>
+      <input id="q" type="search" placeholder="Titolo, note, riferimento…" [(ngModel)]="q" (keyup.enter)="search(true)" />
+    </div>
+
+    <div class="field">
+      <label for="status">Stato</label>
+      <select id="status" [(ngModel)]="status" (change)="search(true)">
+        <option value="open">Aperte</option>
+        <option value="done">Evase</option>
+        <option value="cancelled">Annullate</option>
+        <option value="">Tutte</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="range">Periodo</label>
+      <select id="range" [(ngModel)]="range" (change)="search(true)">
+        <option value="">Qualsiasi</option>
+        <option value="overdue">Solo scadute</option>
+        <option value="today">Oggi</option>
+        <option value="7">Entro 7 giorni</option>
+        <option value="30">Entro 30 giorni</option>
+        <option value="90">Entro 90 giorni</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="category">Categoria</label>
+      <select id="category" [(ngModel)]="categoryId" (change)="search(true)">
+        <option [ngValue]="null">Tutte</option>
+        @for (c of categories(); track c.id) {
+          <option [ngValue]="c.id">{{ c.name }}</option>
+        }
+      </select>
+    </div>
+
+    <button class="btn btn-primary" type="button" (click)="search(true)" [disabled]="loading()">Filtra</button>
+    <button class="btn" type="button" (click)="resetFilters()">Azzera</button>
+  </div>
+</div>
+
+<div class="card">
+  @if (loading()) {
+    <p class="empty">Caricamento…</p>
+  } @else if (items().length === 0) {
+    <p class="empty">Nessuna scadenza trovata con questi filtri.</p>
+  } @else {
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr>
+            <th><button class="sort" type="button" (click)="sortBy('title')">Scadenza</button></th>
+            <th><button class="sort" type="button" (click)="sortBy('due_date')">Data</button></th>
+            <th>Stato</th>
+            <th>Categoria</th>
+            <th>Riferimento</th>
+            <th class="right"><button class="sort" type="button" (click)="sortBy('amount')">Importo</button></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (d of items(); track d.id) {
+            <tr [class.row-overdue]="d.is_overdue">
+              <td>
+                <a [routerLink]="['/scadenze', d.id]">{{ d.title }}</a>
+                @if (d.recurrence !== 'none') {
+                  <span class="badge badge-neutral">ricorrente</span>
+                }
+                @if (d.source !== 'manual') {
+                  <span class="badge badge-neutral">{{ d.source }}</span>
+                }
+              </td>
+              <td class="nowrap">{{ d.due_date | date: 'dd/MM/yyyy' }}</td>
+              <td><app-due-badge [days]="d.days_left" [done]="d.status !== 'open'" /></td>
+              <td>
+                @if (d.category) {
+                  <span class="chip"><span class="dot" [style.background]="d.category.color"></span>{{ d.category.name }}</span>
+                } @else {
+                  <span class="muted">—</span>
+                }
+              </td>
+              <td>{{ d.owner || d.reference || '—' }}</td>
+              <td class="right nowrap">{{ d.amount !== null ? (d.amount | currency: 'EUR') : '—' }}</td>
+              <td class="right nowrap actions">
+                @if (d.status === 'open') {
+                  <button class="btn btn-sm" type="button" (click)="complete(d)">Evadi</button>
+                } @else {
+                  <button class="btn btn-sm" type="button" (click)="reopen(d)">Riapri</button>
+                }
+                <button class="btn btn-sm btn-danger" type="button" (click)="remove(d)">Elimina</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pager">
+      <button class="btn btn-sm" type="button" (click)="goToPage(page() - 1)" [disabled]="page() <= 1">← Precedente</button>
+      <span class="small muted">Pagina {{ page() }} di {{ totalPages() }}</span>
+      <button class="btn btn-sm" type="button" (click)="goToPage(page() + 1)" [disabled]="page() >= totalPages()">
+        Successiva →
+      </button>
+    </div>
+  }
+</div>

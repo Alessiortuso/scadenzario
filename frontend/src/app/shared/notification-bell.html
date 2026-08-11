@@ -1,0 +1,39 @@
+<button class="bell" type="button" (click)="toggle()" [attr.aria-expanded]="open()" aria-label="Notifiche">
+  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8">
+    <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M13.7 21a2 2 0 0 1-3.4 0" stroke-linecap="round" stroke-linejoin="round" />
+  </svg>
+  @if (store.unread() > 0) {
+    <span class="count">{{ store.unread() > 99 ? '99+' : store.unread() }}</span>
+  }
+</button>
+
+@if (open()) {
+  <div class="panel">
+    <header>
+      <strong>Notifiche</strong>
+      <button class="btn btn-ghost btn-sm" type="button" (click)="store.markAllRead()" [disabled]="store.unread() === 0">
+        Segna tutte lette
+      </button>
+    </header>
+
+    <div class="list">
+      @if (store.loading() && store.items().length === 0) {
+        <p class="empty small">Caricamento…</p>
+      } @else if (store.items().length === 0) {
+        <p class="empty small">Nessuna notifica. Gli avvisi compaiono qui quando una scadenza si avvicina.</p>
+      } @else {
+        @for (n of store.items(); track n.id) {
+          <button class="item" type="button" [class.unread]="!n.read_at" (click)="openNotification(n)">
+            <span class="dot" [class]="'dot tone-' + severityTone(n.severity)"></span>
+            <span class="text">
+              <span class="title">{{ n.title }}</span>
+              <span class="body small muted">{{ n.body }}</span>
+              <span class="when small muted">{{ n.scheduled_for | date: 'd MMM y, HH:mm' }}</span>
+            </span>
+          </button>
+        }
+      }
+    </div>
+  </div>
+}

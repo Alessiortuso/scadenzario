@@ -1,0 +1,40 @@
+{
+  "name": "scadenzario-desktop",
+  "productName": "Scadenzario",
+  "version": "1.0.0",
+  "description": "Scadenzario — avvisi e notifiche desktop",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dev": "cross-env SCADENZARIO_DEV=1 electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "cross-env": "^10.1.0",
+    "electron": "^40.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "dependencies": {
+    "electron-updater": "^6.6.2"
+  },
+  "build": {
+    "appId": "it.scadenzario.desktop",
+    "productName": "Scadenzario",
+    "directories": { "output": "release" },
+    "files": ["main.js", "preload.js", "assets/**/*"],
+    "extraResources": [{ "from": "../backend/dist/scadenzario-backend", "to": "backend" }],
+    "win": {
+      "target": ["nsis"],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Scadenzario"
+    },
+    "publish": [{ "provider": "github", "owner": "Alessiortuso", "repo": "scadenzario" }]
+  }
+}
