@@ -86,6 +86,23 @@ function Invoke-Comando([string]$descrizione, [scriptblock]$comando) {
     }
 }
 
+<# Lettura e scrittura di file di testo del progetto.
+
+   Non si usano Get-Content/Set-Content: su PowerShell 5.1 `Get-Content -Raw`
+   legge un file UTF-8 privo di BOM come se fosse ANSI — accenti e trattini
+   lunghi diventano illeggibili — e `Set-Content -Encoding utf8` riscrive
+   aggiungendo un BOM, che in testa a package.json basta a rendere il file
+   JSON invalido per Node. .NET invece riconosce la codifica da sé e sa
+   scrivere UTF-8 pulito. #>
+function Read-TestoUtf8([string]$percorso) {
+    return [System.IO.File]::ReadAllText($percorso)
+}
+
+function Write-TestoUtf8([string]$percorso, [string]$testo) {
+    $senzaBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($percorso, $testo, $senzaBom)
+}
+
 function Get-Sha512Base64([string]$percorso) {
     $sha = [System.Security.Cryptography.SHA512]::Create()
     $stream = [System.IO.File]::OpenRead($percorso)
@@ -153,7 +170,7 @@ Set-Location $RepoRoot
 
 # Il repository legge owner/repo dalla configurazione di electron-builder, così
 # non c'è un secondo posto da aggiornare se il progetto cambia casa.
-$pkg = Get-Content (Join-Path $Desktop "package.json") -Raw | ConvertFrom-Json
+$pkg = Read-TestoUtf8 (Join-Path $Desktop "package.json") | ConvertFrom-Json
 $pubblicazione = $pkg.build.publish[0]
 $slug = "$($pubblicazione.owner)/$($pubblicazione.repo)"
 
@@ -215,16 +232,33 @@ if ($SkipTests) {
 Write-Passo "Numero di versione"
 
 $percorsoPkg = Join-Path $Desktop "package.json"
-$testoPkg = Get-Content $percorsoPkg -Raw
-$testoPkg = [regex]::Replace($testoPkg, '("version"\s*:\s*)"\d+\.\d+\.\d+"', "`${1}`"$Version`"", 1)
-Set-Content -Path $percorsoPkg -Value $testoPkg -Encoding utf8 -NoNewline
+$testoPkg = Read-TestoUtf8 $percorsoPkg
+Write-TestoUtf8 $percorsoPkg ([regex]::Replace($testoPkg, '("version"\s*:\s*)"\d+\.\d+\.\d+"', "`${1}`"$Version`"", 1))
 
 $percorsoMain = Join-Path $Backend "app\main.py"
-$testoMain = Get-Content $percorsoMain -Raw
-$testoMain = [regex]::Replace($testoMain, '(version=)"\d+\.\d+\.\d+"', "`${1}`"$Version`"", 1)
-Set-Content -Path $percorsoMain -Value $testoMain -Encoding utf8 -NoNewline
+$testoMain = Read-TestoUtf8 $percorsoMain
+Write-TestoUtf8 $percorsoMain ([regex]::Replace($testoMain, '(version=)"\d+\.\d+\.\d+"', "`${1}`"$Version`"", 1))
 
-Write-Host "  Aggiornati package.json e app/main.py"
+# Rileggere e ricontrollare non è pignoleria: un file rovinato qui si
+# manifesta molto più avanti, quando electron-builder non riesce più a
+# leggere package.json, e a quel punto il motivo non è più evidente.
+$primiByte = [System.IO.File]::ReadAllBytes($percorsoPkg)
+if ($primiByte.Length -ge 3 -and $primiByte[0] -eq 0xEF -and $primiByte[1] -eq 0xBB -and $primiByte[2] -eq 0xBF) {
+    Stop-Con "package.json e' stato scritto con un BOM: Node non riuscirebbe a leggerlo."
+}
+try {
+    $riletto = Read-TestoUtf8 $percorsoPkg | ConvertFrom-Json
+} catch {
+    Stop-Con "package.json non e' piu' JSON valido dopo il cambio di versione."
+}
+if ($riletto.version -ne $Version) {
+    Stop-Con "package.json riporta ancora la versione $($riletto.version)."
+}
+if ((Read-TestoUtf8 $percorsoMain) -notmatch [regex]::Escape("version=`"$Version`"")) {
+    Stop-Con "app/main.py non riporta la versione $Version."
+}
+
+Write-Host "  Aggiornati e riletti package.json e app/main.py"
 
 # ------------------------------------------------------------- compilazione
 

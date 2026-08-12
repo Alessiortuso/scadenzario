@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.app_name,
     description="Gestione scadenze con avvisi e notifiche desktop.",
-    version="1.0.3",
+    version="1.0.2",
     lifespan=lifespan,
 )
 
@@ -99,7 +99,7 @@ def _mount_frontend() -> None:
     """Serve il frontend compilato, se presente.
 
     In sviluppo si usa `ng serve` e questa cartella non esiste; nel pacchetto
-    distribuito il backend serve anche l'interfaccia, cosÃ¬ gira un processo solo.
+    distribuito il backend serve anche l'interfaccia, così gira un processo solo.
     """
     candidates = [
         Path(__file__).resolve().parent / "static",  # copia inclusa nel pacchetto
