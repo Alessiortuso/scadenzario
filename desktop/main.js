@@ -11,7 +11,7 @@
  *  - controllare la presenza di aggiornamenti.
  */
 
-const { app, BrowserWindow, Tray, Menu, Notification, shell, nativeImage } = require('electron');
+const { app, BrowserWindow, Tray, Menu, Notification, screen, shell, nativeImage } = require('electron');
 const { spawn } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs');
@@ -94,6 +94,44 @@ function iconPath() {
   return fs.existsSync(file) ? file : undefined;
 }
 
+// L'.ico contiene la stessa icona disegnata a più misure (16, 24, 32, ... 256).
+// Caricandolo per intero Electron tiene la più grande e lascia che sia Windows
+// a rimpicciolirla: nella tray, che è alta 16 punti, la "S" si impasta e non si
+// riconosce più. Qui peschiamo dal file la misura giusta, quella disegnata
+// apposta per quello spazio.
+function icoRepresentation(file, wanted) {
+  const data = fs.readFileSync(file);
+  if (data.length < 6 || data.readUInt16LE(2) !== 1) return null;
+
+  const entries = [];
+  for (let i = 0; i < data.readUInt16LE(4); i += 1) {
+    const dir = 6 + 16 * i;
+    if (dir + 16 > data.length) break;
+    entries.push({
+      size: data.readUInt8(dir) || 256,
+      length: data.readUInt32LE(dir + 8),
+      offset: data.readUInt32LE(dir + 12),
+    });
+  }
+  entries.sort((a, b) => a.size - b.size);
+
+  const entry = entries.find((e) => e.size >= wanted) || entries[entries.length - 1];
+  if (!entry || entry.offset + entry.length > data.length) return null;
+
+  // Le misure sono salvate come PNG: il buffer si può passare così com'è.
+  const bytes = data.subarray(entry.offset, entry.offset + entry.length);
+  if (bytes.subarray(0, 4).toString('latin1') !== '\x89PNG') return null;
+
+  const image = nativeImage.createFromBuffer(bytes);
+  return image.isEmpty() ? null : image;
+}
+
+function iconImage(wanted) {
+  const file = iconPath();
+  if (!file) return nativeImage.createEmpty();
+  return icoRepresentation(file, wanted) || nativeImage.createFromPath(file);
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -142,8 +180,8 @@ function showWindow(route) {
 }
 
 function createTray() {
-  const icon = iconPath();
-  tray = new Tray(icon ? nativeImage.createFromPath(icon) : nativeImage.createEmpty());
+  const { scaleFactor } = screen.getPrimaryDisplay();
+  tray = new Tray(iconImage(Math.round(16 * scaleFactor)));
   tray.setToolTip('Scadenzario');
   tray.setContextMenu(
     Menu.buildFromTemplate([
