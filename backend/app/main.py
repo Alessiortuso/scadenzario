@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.app_name,
     description="Gestione scadenze con avvisi e notifiche desktop.",
-    version="1.0.3",
+    version="1.0.4",
     lifespan=lifespan,
 )
 
