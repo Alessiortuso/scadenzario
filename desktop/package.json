@@ -1,8 +1,8 @@
-{
+﻿{
   "name": "scadenzario-desktop",
   "productName": "Scadenzario",
-  "version": "1.0.2",
-  "description": "Scadenzario — avvisi e notifiche desktop",
+  "version": "1.0.3",
+  "description": "Scadenzario â€” avvisi e notifiche desktop",
   "main": "main.js",
   "private": true,
   "scripts": {
