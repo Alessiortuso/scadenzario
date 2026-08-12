@@ -277,7 +277,13 @@ function setupUpdater() {
 // ------------------------------------------------------------ ciclo vita
 
 app.whenReady().then(async () => {
-  app.setAppUserModelId('it.scadenzario.desktop');
+  // Windows non prende l'icona del pulsante nella barra dalla finestra, ma da
+  // quella che ha in cache per questa identità. In sviluppo il processo è
+  // electron.exe: se si presentasse con l'identità dell'app installata,
+  // Windows assocerebbe a "it.scadenzario.desktop" l'icona di Electron —
+  // l'atomo — e la terrebbe poi anche per l'app vera. Da qui un'identità
+  // separata quando non siamo impacchettati.
+  app.setAppUserModelId(app.isPackaged ? 'it.scadenzario.desktop' : 'it.scadenzario.desktop.sviluppo');
   startBackend();
   createTray();
   await waitForBackend();
