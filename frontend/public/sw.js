@@ -26,7 +26,10 @@ self.addEventListener('push', (event) => {
     badge: ICON,
     tag: payload.tag || `scadenzario-${Date.now()}`,
     renotify: Boolean(payload.tag),
-    requireInteraction: payload.severity === 'danger' || payload.severity === 'critical',
+    // L'avviso resta sullo schermo finché non lo si apre o non lo si scarta:
+    // se svanisse da solo, chi non sta guardando lo schermo in quell'istante
+    // non saprebbe mai che è arrivato.
+    requireInteraction: true,
     data: { url: payload.url || '/', notificationId: payload.notificationId },
     actions: [{ action: 'open', title: 'Apri scadenza' }],
   };
