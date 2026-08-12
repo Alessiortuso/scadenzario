@@ -5,34 +5,10 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from app.api import notifications as notifications_api
-from app.db import get_db, get_local_db
-from app.main import app
 from app.models import DeadlineStatus, Notification, NotificationStatus
-
-
-@pytest.fixture
-def client(shared_db, local_db, monkeypatch):
-    """Client HTTP con i due database di test al posto di quelli reali.
-
-    `to-display` non passa dalle dipendenze per il database condiviso — lo apre
-    da sé, proprio per non rispondere 503 quando manca — quindi va sostituita
-    anche la sessione che usa.
-    """
-    app.dependency_overrides[get_db] = lambda: shared_db
-    app.dependency_overrides[get_local_db] = lambda: local_db
-    monkeypatch.setattr(notifications_api, "SharedSession", lambda: shared_db)
-    monkeypatch.setattr(notifications_api, "is_shared_configured", lambda: True)
-
-    # Senza `with`: il lifespan non parte, quindi i test non toccano il
-    # database reale della postazione né il PostgreSQL condiviso.
-    yield TestClient(app)
-
-    app.dependency_overrides.clear()
 
 
 def _avviso_consegnato(local_db, deadline_id: int, *, chiave: str = "k1") -> Notification:

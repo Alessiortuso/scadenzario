@@ -63,6 +63,7 @@
             <th><button class="sort" type="button" (click)="sortBy('title')">Scadenza</button></th>
             <th><button class="sort" type="button" (click)="sortBy('due_date')">Data</button></th>
             <th>Stato</th>
+            <th><button class="sort" type="button" (click)="sortBy('priority')">Priorità</button></th>
             <th>Categoria</th>
             <th>Riferimento</th>
             <th class="right"><button class="sort" type="button" (click)="sortBy('amount')">Importo</button></th>
@@ -83,6 +84,7 @@
               </td>
               <td class="nowrap">{{ d.due_date | date: 'dd/MM/yyyy' }}</td>
               <td><app-due-badge [days]="d.days_left" [done]="d.status !== 'open'" /></td>
+              <td><app-priority-badge [priority]="d.priority" /></td>
               <td>
                 @if (d.category) {
                   <span class="chip"><span class="dot" [style.background]="d.category.color"></span>{{ d.category.name }}</span>

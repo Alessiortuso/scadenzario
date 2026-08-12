@@ -8,12 +8,13 @@ import { ApiService } from '../../core/api.service';
 import { Category, Deadline, DeadlineQuery, DeadlineStatus } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { DueBadge } from '../../shared/due-badge';
+import { PriorityBadge } from '../../shared/priority-badge';
 
 type RangeKey = '' | 'overdue' | 'today' | '7' | '30' | '90';
 
 @Component({
   selector: 'app-deadline-list',
-  imports: [RouterLink, FormsModule, DatePipe, CurrencyPipe, DueBadge],
+  imports: [RouterLink, FormsModule, DatePipe, CurrencyPipe, DueBadge, PriorityBadge],
   templateUrl: './deadline-list.html',
   styleUrl: './deadline-list.scss',
 })

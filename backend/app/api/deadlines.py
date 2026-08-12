@@ -3,11 +3,11 @@ from __future__ import annotations
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import case, delete, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from ..db import get_db, get_local_db
-from ..models import Deadline, DeadlineStatus, Notification
+from ..models import Deadline, DeadlineStatus, Notification, Priority
 from ..schemas import (
     DeadlineCreate,
     DeadlinePage,
@@ -18,6 +18,18 @@ from ..schemas import (
 from ..services import alerts, deadlines as deadline_service, settings_service
 
 router = APIRouter(prefix="/api/deadlines", tags=["scadenze"])
+
+#: Ordine di urgenza della priorità.
+#:
+#: In tabella la priorità è una parola ("CRITICAL", "HIGH", ...), quindi
+#: ordinarla direttamente darebbe l'ordine alfabetico — critica, alta, bassa,
+#: normale — che non vuol dire niente. Qui la si traduce in un rango numerico.
+_PRIORITY_RANK = case(
+    (Deadline.priority == Priority.CRITICAL, 0),
+    (Deadline.priority == Priority.HIGH, 1),
+    (Deadline.priority == Priority.NORMAL, 2),
+    else_=3,
+)
 
 
 def _get_or_404(db: Session, deadline_id: int) -> Deadline:
@@ -65,15 +77,23 @@ def list_deadlines(
 
     total = db.scalar(select(func.count(Deadline.id)).where(*conditions)) or 0
 
-    desc = sort.startswith("-")
-    column = getattr(Deadline, sort.lstrip("-"))
-    order = column.desc() if desc else column.asc()
+    descending = sort.startswith("-")
+    field = sort.lstrip("-")
+    # `sort=priority` mette le più urgenti in cima, `-priority` le meno urgenti.
+    column = _PRIORITY_RANK if field == "priority" else getattr(Deadline, field)
+
+    order = [column.desc() if descending else column.asc()]
+    if field == "priority":
+        # A parità di priorità conta la data: fra due critiche viene prima
+        # quella che scade prima.
+        order.append(Deadline.due_date.asc())
+    order.append(Deadline.id.asc())
 
     items = db.scalars(
         select(Deadline)
         .options(selectinload(Deadline.category))
         .where(*conditions)
-        .order_by(order, Deadline.id.asc())
+        .order_by(*order)
         .offset((page - 1) * page_size)
         .limit(page_size)
     ).all()
