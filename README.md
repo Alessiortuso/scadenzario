@@ -148,6 +148,30 @@ I test coprono la parte del sistema in cui un errore non si vede, perché non so
 
 I due database di prova vengono ricreati in memoria **passando dalle migrazioni**, così ogni esecuzione verifica anche che le migrazioni producano lo schema che il codice si aspetta.
 
+## Pubblicare una versione
+
+```powershell
+$env:GH_TOKEN = "<token GitHub con permesso contents: write>"
+.\scripts\release.ps1 -Version 1.0.3
+```
+
+Lo script fa il giro completo — test, numero di versione, compilazione, commit, tag, release, verifica — e si ferma al primo passo che non torna, invece di lasciare a metà qualcosa che sembra riuscito.
+
+Due accorgimenti nascono da altrettante pubblicazioni andate storte:
+
+- **il tag si crea prima della release**: GitHub rifiuta una release definitiva se il tag non esiste ancora;
+- **la release vuota si crea prima di electron-builder**: che avvia due pubblicazioni in parallelo (installer e blockmap), e se la release manca entrambe provano a crearla — quella che perde la corsa muore, spesso portandosi dietro il caricamento dell'installer.
+
+L'ordine di compilazione non è negoziabile: il frontend finisce dentro l'eseguibile del backend, che finisce dentro il pacchetto Electron. Saltare un anello significa pubblicare codice vecchio con un numero di versione nuovo, senza che nulla lo segnali.
+
+Alla fine viene confrontato lo **sha512 dichiarato in `latest.yml` con quello calcolato sull'installer**: se non coincidono le postazioni scaricherebbero l'aggiornamento per poi rifiutarlo. Se la release risulta incompleta, i file parziali vengono rimossi e si ritenta (fino a tre volte).
+
+Per riesaminare una release già pubblicata, senza pubblicare niente:
+
+```powershell
+.\scripts\release.ps1 -Version 1.0.2 -VerifyOnly
+```
+
 ## Avvio — applicazione desktop (sviluppo)
 
 ```powershell
