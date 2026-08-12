@@ -95,6 +95,18 @@ def save_setup(payload: SetupPayload) -> SetupStatus:
             "email_sender_device": payload.email_sender_device,
         }
     )
-    configure_shared(url, create_tables=True)
+
+    try:
+        configure_shared(url, migrate=True)
+    except Exception as exc:
+        # La connessione funziona ma lo schema non si lascia preparare: capita
+        # con un utente senza permessi di creare tabelle. Va detto qui, non
+        # lasciato emergere come errore generico al primo uso.
+        logger.exception("Preparazione dello schema condiviso fallita")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Connessione riuscita, ma la preparazione dello schema è fallita: {str(exc).splitlines()[0][:300]}",
+        ) from exc
+
     logger.info("Database condiviso configurato su questa postazione")
     return status()

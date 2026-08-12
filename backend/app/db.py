@@ -55,18 +55,19 @@ class LocalBase(DeclarativeBase):
     """Tabelle del database locale alla postazione."""
 
 
-def configure_shared(url: str, *, create_tables: bool = False) -> Engine:
+def configure_shared(url: str, *, migrate: bool = False) -> Engine:
     """Collega (o ricollega) il database condiviso all'URL indicato."""
     global shared_engine
 
     engine = _make_engine(url)
+
+    if migrate:
+        from . import migrations, models  # noqa: F401  (i modelli registrano i metadata)
+
+        migrations.upgrade(engine, "shared")
+
     SharedSession.configure(bind=engine)
     shared_engine = engine
-
-    if create_tables:
-        from . import models  # noqa: F401
-
-        Base.metadata.create_all(bind=engine)
     return engine
 
 
@@ -93,11 +94,15 @@ def get_local_db() -> Iterator[Session]:
 
 
 def init_db() -> None:
-    """Prepara il database locale e, se configurato, quello condiviso."""
-    from . import models  # noqa: F401  (registra i modelli sui metadata)
+    """Prepara il database locale e, se configurato, quello condiviso.
 
-    LocalBase.metadata.create_all(bind=local_engine)
+    Entrambi gli schemi passano dalle migrazioni: il locale sempre, il condiviso
+    solo quando la postazione è già configurata.
+    """
+    from . import migrations, models  # noqa: F401  (registra i modelli sui metadata)
+
+    migrations.upgrade(local_engine, "local")
 
     url = runtime_config.database_url()
     if url:
-        configure_shared(url, create_tables=True)
+        configure_shared(url, migrate=True)

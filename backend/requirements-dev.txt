@@ -1,0 +1,6 @@
+-r requirements.txt
+
+# Test:
+#   .venv\Scripts\python.exe -m pytest
+pytest>=8.0.0
+httpx>=0.28.0

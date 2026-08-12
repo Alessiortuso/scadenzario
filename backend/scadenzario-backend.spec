@@ -16,6 +16,8 @@ from PyInstaller.utils.hooks import collect_submodules
 hidden = [
     *collect_submodules("uvicorn"),
     *collect_submodules("psycopg"),
+    # I dialetti DDL (alembic.ddl.postgresql, ...) sono importati dinamicamente.
+    *collect_submodules("alembic"),
     "psycopg.pq",
     "psycopg_binary",
     "openpyxl",
@@ -31,6 +33,8 @@ a = Analysis(
     binaries=[],
     datas=[
         ("../frontend/dist/frontend/browser", "app/static"),
+        # Le migrazioni vengono eseguite all'avvio: devono viaggiare con l'exe.
+        ("alembic", "alembic"),
     ],
     hiddenimports=hidden,
     hookspath=[],

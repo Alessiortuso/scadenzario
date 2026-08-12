@@ -3,11 +3,11 @@ from __future__ import annotations
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from ..db import get_db, get_local_db
-from ..models import Deadline, DeadlineStatus
+from ..models import Deadline, DeadlineStatus, Notification
 from ..schemas import (
     DeadlineCreate,
     DeadlinePage,
@@ -172,7 +172,17 @@ def reopen_deadline(
 
 
 @router.delete("/{deadline_id}", status_code=204)
-def delete_deadline(deadline_id: int, db: Session = Depends(get_db)) -> None:
+def delete_deadline(
+    deadline_id: int,
+    db: Session = Depends(get_db),
+    local_db: Session = Depends(get_local_db),
+) -> None:
     deadline = _get_or_404(db, deadline_id)
     db.delete(deadline)
     db.commit()
+
+    # Gli avvisi di questa postazione sopravvivrebbero fino al ciclo successivo
+    # dello scheduler, con la campanella che rimanda a una scadenza inesistente.
+    # Sulle altre postazioni ci pensa `alerts.sync_all`.
+    local_db.execute(delete(Notification).where(Notification.deadline_id == deadline_id))
+    local_db.commit()

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
@@ -9,6 +9,19 @@ from .models import DeadlineStatus, NotificationStatus, Priority, Recurrence
 
 class ORMModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
+
+def _as_utc(value: datetime | None) -> datetime | None:
+    """Riattacca il fuso ai timestamp che tornano nudi.
+
+    SQLite non memorizza l'offset: i valori scritti in UTC si rileggono senza
+    fuso. Serializzati così, il browser li interpreta come ora locale e mostra
+    un orario sbagliato (due ore indietro d'estate). Il database condiviso in
+    PostgreSQL non ne soffre, ma quello locale delle notifiche sì.
+    """
+    if value is not None and value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
 
 
 # --------------------------------------------------------------------------- categorie
@@ -89,6 +102,12 @@ class DeadlineRead(ORMModel, DeadlineBase):
     days_left: int
     is_overdue: bool
 
+    # Serve quando il database condiviso è uno SQLite di sviluppo.
+    @field_validator("completed_at", "created_at", "updated_at")
+    @classmethod
+    def _utc(cls, v: datetime | None) -> datetime | None:
+        return _as_utc(v)
+
 
 class DeadlinePage(BaseModel):
     items: list[DeadlineRead]
@@ -129,6 +148,11 @@ class NotificationRead(ORMModel):
     read_at: datetime | None
     displayed_at: datetime | None
     channel_results: dict | None
+
+    @field_validator("scheduled_for", "sent_at", "read_at", "displayed_at")
+    @classmethod
+    def _utc(cls, v: datetime | None) -> datetime | None:
+        return _as_utc(v)
 
 
 class NotificationCounts(BaseModel):

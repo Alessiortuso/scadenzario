@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select, update
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from ..db import get_db, get_local_db
+from ..db import SharedSession, get_local_db, is_shared_configured
 from ..models import Deadline, DeadlineStatus, Notification, NotificationStatus
 from ..schemas import NotificationCounts, NotificationRead
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/notifications", tags=["notifiche"])
 
 
@@ -48,10 +51,36 @@ def counts(db: Session = Depends(get_local_db)) -> NotificationCounts:
     )
 
 
+def _open_deadline_ids(deadline_ids: set[int]) -> set[int] | None:
+    """Quali di queste scadenze risultano ancora aperte sul database condiviso.
+
+    Ritorna `None` quando la domanda non è rispondibile — postazione non ancora
+    configurata, Neon in fase di risveglio, rete assente: casi in cui *non
+    sappiamo*, che vanno tenuti distinti da "la scadenza non è più aperta".
+    """
+    if not is_shared_configured():
+        return None
+
+    shared_db = SharedSession()
+    try:
+        return set(
+            shared_db.scalars(
+                select(Deadline.id).where(
+                    Deadline.id.in_(deadline_ids),
+                    Deadline.status == DeadlineStatus.OPEN,
+                )
+            ).all()
+        )
+    except SQLAlchemyError as exc:
+        logger.warning("Database condiviso non raggiungibile per la verifica avvisi: %s", exc)
+        return None
+    finally:
+        shared_db.close()
+
+
 @router.get("/to-display", response_model=list[NotificationRead])
 def to_display(
     db: Session = Depends(get_local_db),
-    shared_db: Session = Depends(get_db),
     limit: int = Query(10, ge=1, le=50),
 ) -> list[Notification]:
     """Avvisi consegnati ma non ancora mostrati come toast su questa postazione.
@@ -63,6 +92,12 @@ def to_display(
     consegna e il toast un collega può aver evaso o eliminato la scadenza da
     un'altra postazione, e mostrare un avviso per qualcosa di già fatto è
     peggio che non mostrarlo affatto.
+
+    Se però il database condiviso non risponde, gli avvisi si mostrano lo
+    stesso: un promemoria di troppo si ignora, uno mancato fa perdere una
+    scadenza. Per lo stesso motivo l'endpoint **non** dipende dal database
+    condiviso: rispondere 503 qui significherebbe nessuna notifica finché Neon
+    dorme.
     """
     candidates = list(
         db.scalars(
@@ -78,14 +113,9 @@ def to_display(
     if not candidates:
         return []
 
-    still_open = set(
-        shared_db.scalars(
-            select(Deadline.id).where(
-                Deadline.id.in_({n.deadline_id for n in candidates}),
-                Deadline.status == DeadlineStatus.OPEN,
-            )
-        ).all()
-    )
+    still_open = _open_deadline_ids({n.deadline_id for n in candidates})
+    if still_open is None:
+        return candidates
 
     now = datetime.now(timezone.utc)
     fresh: list[Notification] = []

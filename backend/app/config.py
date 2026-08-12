@@ -26,7 +26,10 @@ class Settings(BaseSettings):
     #: per ogni PC su cui gira l'applicazione.
     email_sender_device: bool = False
     timezone: str = "Europe/Rome"
-    cors_origins: str = "http://localhost:4200"
+    #: Serve solo al dev server Angular, che gira sulla 4300 (la 4200 era
+    #: occupata su questa macchina). Nel pacchetto distribuito il backend serve
+    #: anche l'interfaccia, quindi non c'è nessuna origine esterna da ammettere.
+    cors_origins: str = "http://localhost:4300"
 
     # Preavvisi di default (giorni prima della scadenza) usati quando né la
     # scadenza né la categoria ne definiscono di propri.

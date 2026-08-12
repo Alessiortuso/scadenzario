@@ -88,6 +88,25 @@ Due avvertenze operative:
 
 Sul database condiviso vivono solo tre tabelle — `deadlines`, `categories`, `settings`. Le notifiche stanno nel database locale di ciascuna postazione.
 
+## Evoluzione dello schema
+
+Lo schema è gestito con **Alembic** e si aggiorna da sé: a ogni avvio il backend porta il database locale all'ultima revisione, e fa lo stesso con quello condiviso appena la postazione è configurata. Un aggiornamento dell'applicazione porta quindi con sé il proprio adeguamento del database, senza interventi manuali sulle postazioni.
+
+I due database hanno storie separate — tabelle di versione distinte, `alembic_version` e `alembic_version_local` — perché uno è condiviso da tutti e l'altro appartiene alla singola postazione.
+
+Le installazioni nate prima delle migrazioni (la 1.0.0, che creava le tabelle con `create_all`) non vengono ricreate: al primo avvio lo schema esistente viene *marcato* alla revisione iniziale, e da lì in poi segue le migrazioni normalmente.
+
+Per aggiungere una modifica dopo aver cambiato i modelli:
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m alembic revision -m "aggiunge il campo allegato"
+```
+
+Il file generato in `alembic/versions/` ha una funzione per database: riempi `upgrade_shared` per le tabelle condivise, `upgrade_local` per quelle delle notifiche. Sul database locale le modifiche di colonna richiedono la modalità *batch* di SQLite, già attiva in `alembic/env.py`.
+
+Le migrazioni non si applicano da riga di comando (`alembic upgrade` non ha una connessione: le credenziali stanno nel `config.json` della postazione, non nell'ini). Le applica il backend all'avvio; per forzarle a mano basta `python -c "from app.db import init_db; init_db()"`.
+
 ## Requisiti
 
 - Python 3.11+ (testato su 3.14)
@@ -116,6 +135,18 @@ Copy-Item .env.example .env   # poi incolla le chiavi VAPID
 API su <http://127.0.0.1:8010>, documentazione interattiva su <http://127.0.0.1:8010/docs>.
 
 > Le porte 8000 e 4200 risultavano già occupate da altri servizi su questa macchina, quindi il progetto è configurato su **8010** (backend) e **4300** (frontend). Per cambiarle: `--port` di uvicorn, `proxy.conf.json` e lo script `start` in `frontend/package.json`.
+
+## Test
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m pytest
+```
+
+I test coprono la parte del sistema in cui un errore non si vede, perché non solleva eccezioni ma manda un avviso di troppo o — peggio — nessuno: calcolo dei preavvisi, avvisi di recupero, solleciti, idempotenza della generazione, ricorrenze, consegna multicanale e comportamento quando il database condiviso non risponde.
+
+I due database di prova vengono ricreati in memoria **passando dalle migrazioni**, così ogni esecuzione verifica anche che le migrazioni producano lo schema che il codice si aspetta.
 
 ## Avvio — applicazione desktop (sviluppo)
 
@@ -167,8 +198,11 @@ Ogni avviso ha una `dedupe_key`, quindi non viene mai inviato due volte. Il cicl
 
 ```
 backend/
+  alembic/          migrazioni dello schema (condiviso e locale)
+  tests/            test del motore avvisi, delle ricorrenze e degli endpoint
   app/
     api/            endpoint REST (scadenze, categorie, notifiche, push, import, impostazioni)
+    migrations.py   applicazione delle migrazioni all'avvio
     services/
       alerts.py     calcolo dei preavvisi e generazione notifiche
       dispatcher.py invio multicanale
