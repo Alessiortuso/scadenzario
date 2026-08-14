@@ -32,6 +32,9 @@ class ReminderBase(BaseModel):
     start_time: time | None = None
     kind: ReminderKind = ReminderKind.DEADLINE
     recurrence: Recurrence = Recurrence.NONE
+    #: Quando la ricorrenza ha una fine, le occorrenze esistono tutte da
+    #: subito. Vuoto = ricorrenza aperta, che ne genera una alla volta.
+    recurrence_until: date | None = None
     amount: float | None = None
     owner: str | None = None
     reference: str | None = None
@@ -52,10 +55,20 @@ class ReminderBase(BaseModel):
         return None if v == "" else v
 
 
+class Occurrence(BaseModel):
+    """Una data della serie con il suo importo."""
+
+    due_date: date
+    amount: float | None = None
+
+
 class ReminderCreate(ReminderBase):
     source: str = "manual"
     external_id: str | None = None
     extra: dict | None = None
+    #: Importi per singola occorrenza: le rate di un finanziamento raramente
+    #: sono uguali. Le date non elencate tengono l'importo generale.
+    occurrences: list[Occurrence] | None = None
 
 
 class ReminderUpdate(BaseModel):
@@ -66,6 +79,7 @@ class ReminderUpdate(BaseModel):
     kind: ReminderKind | None = None
     status: ReminderStatus | None = None
     recurrence: Recurrence | None = None
+    recurrence_until: date | None = None
     amount: float | None = None
     owner: str | None = None
     reference: str | None = None
@@ -90,6 +104,10 @@ class ReminderRead(ORMModel, ReminderBase):
     updated_at: datetime
     days_left: int
     is_overdue: bool
+    series_id: str | None = None
+    #: Posizione nella serie, es. (3, 12). Valorizzata solo leggendo il
+    #: singolo promemoria: negli elenchi costerebbe una query per riga.
+    series_position: tuple[int, int] | None = None
 
     # Serve quando il database condiviso è uno SQLite di sviluppo.
     @field_validator("completed_at", "created_at", "updated_at")
@@ -134,6 +152,27 @@ class CalendarDay(BaseModel):
     items: list[ReminderRead]
 
 
+class YearDay(BaseModel):
+    """Un giorno dell'anno con quanti promemoria porta, divisi per tipo.
+
+    Nella vista annuale i titoli non ci starebbero: servono solo i pallini, e
+    mandare i promemoria interi per trecentosessantacinque giorni sarebbe un
+    payload enorme per disegnare dei puntini.
+    """
+
+    date: date
+    deadline: int = 0
+    appointment: int = 0
+    other: int = 0
+    total: int = 0
+
+
+class CalendarYear(BaseModel):
+    year: int
+    #: Solo i giorni che hanno qualcosa: gli altri il frontend li disegna vuoti.
+    days: list[YearDay]
+
+
 class CalendarMonth(BaseModel):
     year: int
     month: int
@@ -168,6 +207,19 @@ class NotificationRead(ORMModel):
 class NotificationCounts(BaseModel):
     unread: int
     total: int
+
+
+class AttentionState(BaseModel):
+    """Quanti avvisi imminenti sono stati consegnati e non ancora guardati.
+
+    È quello che serve al processo Electron per decidere se tenere accesa la
+    segnalazione sulla barra delle applicazioni.
+    """
+
+    count: int
+    days: int
+    #: Il più urgente dei promemoria coinvolti, per il testo del suggerimento.
+    title: str | None = None
 
 
 # --------------------------------------------------------------------------- push
@@ -245,6 +297,9 @@ class AppSettings(BaseModel):
     daily_send_time: str = "08:00"
     notify_emails: list[EmailStr] = []
     quiet_until_next_day: bool = True
+    #: Entro quanti giorni dalla data un avviso ignorato continua a farsi
+    #: notare sulla barra delle applicazioni. 0 = mai, si comporta come prima.
+    insistent_alert_days: int = 3
 
 
 class SettingsRead(AppSettings):

@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session
 
 from ..db import SharedSession, get_local_db, is_shared_configured
 from ..models import Notification, NotificationStatus, Reminder, ReminderStatus
-from ..schemas import NotificationCounts, NotificationRead
+from ..schemas import AppSettings, AttentionState, NotificationCounts, NotificationRead
+from ..services import settings_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/notifications", tags=["notifiche"])
@@ -160,3 +161,92 @@ def mark_all_read(db: Session = Depends(get_local_db)) -> NotificationCounts:
     )
     db.commit()
     return counts(db)
+
+
+# ------------------------------------------------- segnalazione insistente
+
+
+def _soglia_insistenza() -> int:
+    """Entro quanti giorni un avviso ignorato continua a farsi notare.
+
+    Sta fra le impostazioni condivise, ma qui non si può dipendere dal
+    database comune: questo endpoint viene interrogato ogni mezzo minuto dal
+    processo Electron, e se rispondesse 503 mentre Neon dorme la segnalazione
+    si spegnerebbe proprio nei momenti peggiori. Se non si riesce a leggerlo
+    si usa il valore predefinito.
+    """
+    if not is_shared_configured():
+        return AppSettings().insistent_alert_days
+
+    shared_db = SharedSession()
+    try:
+        return settings_service.get_settings(shared_db).insistent_alert_days
+    except SQLAlchemyError as exc:
+        logger.warning("Impostazioni non leggibili per la segnalazione: %s", exc)
+        return AppSettings().insistent_alert_days
+    finally:
+        shared_db.close()
+
+
+def _imminenti(giorni: int):
+    """Avvisi consegnati, non ancora guardati, di promemoria vicini alla data.
+
+    `offset_days` dice quanti giorni mancavano alla scadenza nel momento a cui
+    l'avviso si riferisce: positivo per i preavvisi, zero il giorno stesso,
+    negativo per i solleciti di uno già passato. Filtrarlo per <= soglia
+    seleziona esattamente ciò che è imminente o in ritardo, senza dover
+    interrogare il database condiviso per le date.
+    """
+    return (
+        select(Notification)
+        .where(
+            Notification.status == NotificationStatus.SENT,
+            Notification.read_at.is_(None),
+            Notification.offset_days <= giorni,
+        )
+        .order_by(Notification.offset_days.asc(), Notification.scheduled_for.asc())
+    )
+
+
+@router.get("/attention", response_model=AttentionState)
+def attention(db: Session = Depends(get_local_db)) -> AttentionState:
+    """Se c'è qualcosa di imminente che l'utente non ha ancora guardato.
+
+    Interrogato dal processo Electron per decidere se tenere accesa la
+    segnalazione sulla barra delle applicazioni.
+    """
+    giorni = _soglia_insistenza()
+    if giorni <= 0:
+        return AttentionState(count=0, days=0)
+
+    avvisi = list(db.scalars(_imminenti(giorni)).all())
+    return AttentionState(
+        count=len(avvisi),
+        days=giorni,
+        title=avvisi[0].title if avvisi else None,
+    )
+
+
+@router.post("/attention/seen", response_model=AttentionState)
+def attention_seen(
+    reminder_id: int | None = None,
+    db: Session = Depends(get_local_db),
+) -> AttentionState:
+    """L'utente ha guardato: la segnalazione si spegne.
+
+    La chiama l'interfaccia quando si apre l'elenco dei promemoria o la scheda
+    di uno di essi. Marca come letti solo gli avvisi imminenti — quelli che
+    tengono accesa la segnalazione — e non tutto il centro notifiche: aprire
+    l'elenco non vuol dire aver letto un avviso di trenta giorni fa.
+    """
+    giorni = _soglia_insistenza()
+    if giorni > 0:
+        query = _imminenti(giorni)
+        if reminder_id is not None:
+            query = query.where(Notification.reminder_id == reminder_id)
+        adesso = datetime.now(timezone.utc)
+        for notifica in db.scalars(query).all():
+            notifica.read_at = adesso
+        db.commit()
+
+    return attention(db)

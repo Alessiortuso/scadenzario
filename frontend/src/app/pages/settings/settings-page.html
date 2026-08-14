@@ -92,6 +92,23 @@
       </div>
 
       <div class="field span-2">
+        <label for="insistent">Continua a segnalare sulla barra (giorni prima)</label>
+        <input
+          id="insistent"
+          type="number"
+          min="0"
+          max="365"
+          [value]="s.insistent_alert_days"
+          (change)="patch('insistent_alert_days', +$any($event.target).value)"
+        />
+        <span class="small muted">
+          Se ignori o chiudi un avviso di un promemoria entro questi giorni dalla data, l'icona
+          sulla barra delle applicazioni continua a segnalarlo finché non apri il promemoria o
+          l'elenco. 0 per non insistere.
+        </span>
+      </div>
+
+      <div class="field span-2">
         <label for="emails">Email destinatarie (predefinite)</label>
         <input id="emails" [(ngModel)]="emailsText" placeholder="amministrazione@azienda.it, titolare@azienda.it" />
       </div>

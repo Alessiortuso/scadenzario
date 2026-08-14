@@ -19,8 +19,15 @@ SIZE = 512
 BG = (79, 70, 229)
 FG = (255, 255, 255)
 LETTER = "P"
+#: Il pallino della segnalazione: rosso acceso, bordato di bianco perché si
+#: stacchi anche sopra l'icona scura della barra.
+AVVISO = (239, 68, 68)
 
 ICON = Path(__file__).with_name("icon.ico")
+#: L'icona della tray quando c'è qualcosa da guardare, e il bollino che
+#: Windows sovrappone al pulsante sulla barra delle applicazioni.
+ICON_AVVISO = Path(__file__).with_name("icon-avviso.ico")
+BADGE = Path(__file__).with_name("badge.png")
 #: La favicon serve al frontend, che sta in un altro punto del repository.
 FAVICON = Path(__file__).resolve().parents[2] / "frontend" / "public" / "favicon.ico"
 
@@ -71,7 +78,28 @@ def disegna(*, spunta: bool) -> Image.Image:
     return image
 
 
-def salva(percorso: Path, misure: list[tuple[int, int]]) -> None:
+def pallino(image: Image.Image) -> Image.Image:
+    """Aggiunge il bollino rosso in basso a destra."""
+    marcata = image.copy()
+    draw = ImageDraw.Draw(marcata)
+    # Piccolo e in un angolo: deve dire "guardami" senza coprire la lettera,
+    # che a 16 pixel è già al limite della leggibilità.
+    r = SIZE * 0.19
+    x = y = SIZE - r - SIZE * 0.05
+    draw.ellipse([x - r, y - r, x + r, y + r], fill=AVVISO, outline=FG, width=int(SIZE * 0.04))
+    return marcata
+
+
+def disegna_badge() -> Image.Image:
+    """Solo il bollino, su trasparente: è quello che va sopra al pulsante."""
+    image = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    m = SIZE * 0.06
+    draw.ellipse([m, m, SIZE - m, SIZE - m], fill=AVVISO, outline=FG, width=int(SIZE * 0.06))
+    return image
+
+
+def salva(percorso: Path, misure: list[tuple[int, int]], *, avviso: bool = False) -> None:
     """Scrive un .ico in cui ogni misura è disegnata apposta per la sua taglia.
 
     Pillow, da solo, rimpicciolirebbe una sola immagine per tutte le misure. Le
@@ -85,6 +113,8 @@ def salva(percorso: Path, misure: list[tuple[int, int]]) -> None:
     """
     grande = disegna(spunta=True)
     piccola = disegna(spunta=False)
+    if avviso:
+        grande, piccola = pallino(grande), pallino(piccola)
 
     varianti = [
         (grande if larghezza >= SOGLIA_SPUNTA else piccola).resize((larghezza, altezza))
@@ -100,7 +130,13 @@ def salva(percorso: Path, misure: list[tuple[int, int]]) -> None:
 
 if __name__ == "__main__":
     salva(ICON, ICON_SIZES)
-    print(f"icona creata:   {ICON}")
+    print(f"icona creata:    {ICON}")
+
+    salva(ICON_AVVISO, ICON_SIZES, avviso=True)
+    print(f"icona avviso:    {ICON_AVVISO}")
+
+    disegna_badge().resize((64, 64)).save(BADGE)
+    print(f"bollino creato:  {BADGE}")
 
     salva(FAVICON, FAVICON_SIZES)
-    print(f"favicon creata: {FAVICON}")
+    print(f"favicon creata:  {FAVICON}")

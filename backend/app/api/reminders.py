@@ -7,9 +7,11 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from ..db import get_db, get_local_db
-from ..models import Notification, Reminder, ReminderKind, ReminderStatus
+from ..models import Notification, Recurrence, Reminder, ReminderKind, ReminderStatus
 from ..schemas import (
     CalendarMonth,
+    CalendarYear,
+    Occurrence,
     ReminderCreate,
     ReminderPage,
     ReminderRead,
@@ -105,6 +107,34 @@ def calendar(
     return reminder_service.calendar_month(db, year, month, kind=kind, include_done=include_done)
 
 
+@router.get("/calendar/year", response_model=CalendarYear)
+def calendar_year(
+    year: int = Query(..., ge=1970, le=2200),
+    kind: ReminderKind | None = None,
+    include_done: bool = True,
+    db: Session = Depends(get_db),
+) -> CalendarYear:
+    """L'anno intero come conteggi per giorno, per la vista a dodici mesi."""
+    return reminder_service.calendar_year(db, year, kind=kind, include_done=include_done)
+
+
+@router.get("/occurrences", response_model=list[Occurrence])
+def occurrences(
+    due_date: date,
+    recurrence: Recurrence,
+    recurrence_until: date | None = None,
+    amount: float | None = None,
+) -> list[Occurrence]:
+    """Le date in cui una ricorrenza si ripresenterà, prima di salvarla.
+
+    Serve al form per mostrare la tabella degli importi: il calcolo delle date
+    resta qui, dove sta già quello vero, invece di essere riscritto in
+    JavaScript e divergere alla prima differenza sui mesi corti.
+    """
+    date_serie = reminder_service.occurrence_dates(due_date, recurrence, recurrence_until)
+    return [Occurrence(due_date=quando, amount=amount) for quando in date_serie]
+
+
 @router.get("/upcoming", response_model=list[ReminderRead])
 def upcoming(
     days: int = Query(30, ge=1, le=365),
@@ -128,8 +158,11 @@ def upcoming(
 
 
 @router.get("/{reminder_id}", response_model=ReminderRead)
-def get_reminder(reminder_id: int, db: Session = Depends(get_db)) -> Reminder:
-    return _get_or_404(db, reminder_id)
+def get_reminder(reminder_id: int, db: Session = Depends(get_db)) -> ReminderRead:
+    reminder = _get_or_404(db, reminder_id)
+    letto = ReminderRead.model_validate(reminder)
+    letto.series_position = reminder_service.series_position(db, reminder)
+    return letto
 
 
 @router.post("", response_model=ReminderRead, status_code=201)
@@ -140,12 +173,17 @@ def create_reminder(
 ) -> Reminder:
     data = payload.model_dump()
     data["notify_emails"] = [str(e) for e in (data.get("notify_emails") or [])] or None
-    reminder = Reminder(**data)
-    db.add(reminder)
-    db.commit()
-    saved = _get_or_404(db, reminder.id)
-    alerts.sync_reminder_notifications(local_db, saved, settings_service.get_settings(db))
-    return saved
+    occorrenze = data.pop("occurrences", None) or []
+
+    creati = reminder_service.create_series(
+        db,
+        local_db,
+        data,
+        importi={o["due_date"]: o["amount"] for o in occorrenze},
+    )
+    # Si torna la prima occorrenza: è quella che l'utente ha compilato, ed è
+    # dove il form lo porta dopo il salvataggio.
+    return _get_or_404(db, creati[0].id)
 
 
 @router.patch("/{reminder_id}", response_model=ReminderRead)
@@ -192,10 +230,21 @@ def reopen_reminder(
 @router.delete("/{reminder_id}", status_code=204)
 def delete_reminder(
     reminder_id: int,
+    series: bool = False,
     db: Session = Depends(get_db),
     local_db: Session = Depends(get_local_db),
 ) -> None:
+    """Elimina un promemoria, o l'intera serie con `series=true`.
+
+    Senza questa opzione disdire una rateizzazione in dodici rate vorrebbe
+    dire cancellarle una per una.
+    """
     reminder = _get_or_404(db, reminder_id)
+
+    if series and reminder.series_id:
+        reminder_service.delete_series(db, local_db, reminder.series_id)
+        return
+
     db.delete(reminder)
     db.commit()
 

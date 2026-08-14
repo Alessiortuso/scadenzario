@@ -1,11 +1,18 @@
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { ApiService } from '../../core/api.service';
-import { CalendarDay, KIND_COLORS, KIND_LABELS, Reminder, ReminderKind } from '../../core/models';
+import {
+  CalendarDay,
+  KIND_COLORS,
+  KIND_LABELS,
+  Reminder,
+  ReminderKind,
+  YearDay,
+} from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { KindIcon } from '../../shared/kind-icon';
 import { TimeLabelPipe } from '../../shared/time-label.pipe';
@@ -28,6 +35,21 @@ const MESI = [
 /** Quanti promemoria stanno in una cella prima di riassumere il resto. */
 const MAX_PER_GIORNO = 3;
 
+const MESI_BREVI = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
+
+/** Una casella della vista annuale: un giorno del mese, o un buco allineante. */
+interface CasellaAnno {
+  data: string | null;
+  giorno: number;
+  conteggi: YearDay | null;
+}
+
+interface MeseInMiniatura {
+  mese: number;
+  nome: string;
+  caselle: CasellaAnno[];
+}
+
 @Component({
   selector: 'app-calendar',
   imports: [RouterLink, FormsModule, DatePipe, KindIcon, TimeLabelPipe],
@@ -39,6 +61,7 @@ export class CalendarPage implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly toasts = inject(ToastService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly giorniSettimana = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
   readonly kindLabels = KIND_LABELS;
@@ -52,10 +75,48 @@ export class CalendarPage implements OnInit {
   readonly kind = signal<ReminderKind | ''>('');
   readonly includeDone = signal(true);
 
+  /** Mese o anno: la vista annuale serve a vedere la distribuzione, non i titoli. */
+  readonly vista = signal<'mese' | 'anno'>('mese');
+  readonly anno = signal<YearDay[]>([]);
+
   /** Giorno aperto nel pannello laterale; null = nessuno. */
   readonly selected = signal<CalendarDay | null>(null);
 
-  readonly monthLabel = computed(() => `${MESI[this.month() - 1]} ${this.year()}`);
+  readonly monthLabel = computed(() =>
+    this.vista() === 'anno' ? String(this.year()) : `${MESI[this.month() - 1]} ${this.year()}`,
+  );
+
+  /**
+   * I dodici mesi in miniatura, ognuno con le sue caselle.
+   *
+   * Le caselle vuote in testa allineano il primo giorno alla sua colonna:
+   * senza, ogni mese comincerebbe di lunedì e il colpo d'occhio sulle
+   * settimane — che è tutto il senso di questa vista — andrebbe perso.
+   */
+  readonly mesiDellAnno = computed<MeseInMiniatura[]>(() => {
+    const perData = new Map(this.anno().map((g) => [g.date, g]));
+    const anno = this.year();
+
+    return MESI_BREVI.map((nome, indice) => {
+      const mese = indice + 1;
+      const primo = new Date(anno, indice, 1);
+      const quanti = new Date(anno, mese, 0).getDate();
+      // getDay(): 0 è domenica; qui la settimana comincia di lunedì.
+      const vuote = (primo.getDay() + 6) % 7;
+
+      const caselle: CasellaAnno[] = Array.from({ length: vuote }, () => ({
+        data: null,
+        giorno: 0,
+        conteggi: null,
+      }));
+
+      for (let giorno = 1; giorno <= quanti; giorno += 1) {
+        const data = `${anno}-${String(mese).padStart(2, '0')}-${String(giorno).padStart(2, '0')}`;
+        caselle.push({ data, giorno, conteggi: perData.get(data) ?? null });
+      }
+      return { mese, nome, caselle };
+    });
+  });
 
   /** Le celle divise in righe da sette: la griglia si legge per settimane. */
   readonly weeks = computed(() => {
@@ -79,9 +140,40 @@ export class CalendarPage implements OnInit {
     }
 
     await this.load();
+    this.ricaricaQuandoTornaInPrimoPiano();
+  }
+
+  /** Rilegge il mese ogni volta che si torna a guardare questa pagina.
+   *
+   * Il calendario è l'unica schermata che si tiene aperta e si guarda a
+   * lungo, e da sola non si aggiorna mai: un promemoria eliminato — qui o su
+   * un'altra postazione — resta disegnato nella sua casella finché non si
+   * cambia pagina. Tornare sulla finestra è il momento in cui uno si aspetta
+   * di vedere le cose come stanno adesso.
+   */
+  private ricaricaQuandoTornaInPrimoPiano(): void {
+    const rileggi = () => {
+      if (document.visibilityState === 'visible') {
+        void this.load();
+      }
+    };
+
+    // `focus` copre il rientro nella finestra, `visibilitychange` il ritorno
+    // sulla scheda: nell'app desktop scatta il primo, nel browser il secondo.
+    window.addEventListener('focus', rileggi);
+    document.addEventListener('visibilitychange', rileggi);
+    this.destroyRef.onDestroy(() => {
+      window.removeEventListener('focus', rileggi);
+      document.removeEventListener('visibilitychange', rileggi);
+    });
   }
 
   async load(): Promise<void> {
+    if (this.vista() === 'anno') {
+      await this.loadAnno();
+      return;
+    }
+
     this.loading.set(true);
     try {
       const mese = await firstValueFrom(
@@ -107,6 +199,50 @@ export class CalendarPage implements OnInit {
     }
   }
 
+  private async loadAnno(): Promise<void> {
+    this.loading.set(true);
+    try {
+      const anno = await firstValueFrom(
+        this.api.calendarYear(this.year(), this.kind() || undefined, this.includeDone()),
+      );
+      this.anno.set(anno.days);
+    } catch {
+      this.toasts.error('Caricamento del calendario non riuscito');
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  async cambiaVista(vista: 'mese' | 'anno'): Promise<void> {
+    this.vista.set(vista);
+    this.selected.set(null);
+    await this.load();
+  }
+
+  /** Dalla miniatura al mese vero, sul giorno cliccato. */
+  async apriGiorno(casella: CasellaAnno): Promise<void> {
+    if (casella.data === null) {
+      return;
+    }
+    const [, mese] = casella.data.split('-').map(Number);
+    this.vista.set('mese');
+    await this.goTo(this.year(), mese);
+    this.selected.set(this.days().find((d) => d.date === casella.data) ?? null);
+  }
+
+  /** Dalla miniatura al mese intero, cliccando il nome. */
+  async apriMese(mese: number): Promise<void> {
+    this.vista.set('mese');
+    await this.goTo(this.year(), mese);
+  }
+
+  /** Il colore del pallino: il tipo più urgente presente in quel giorno. */
+  coloreGiorno(conteggi: YearDay): string {
+    if (conteggi.deadline > 0) return KIND_COLORS.deadline;
+    if (conteggi.appointment > 0) return KIND_COLORS.appointment;
+    return KIND_COLORS.other;
+  }
+
   private async goTo(year: number, month: number): Promise<void> {
     this.year.set(year);
     this.month.set(month);
@@ -119,11 +255,19 @@ export class CalendarPage implements OnInit {
   }
 
   async previousMonth(): Promise<void> {
+    if (this.vista() === 'anno') {
+      await this.goTo(this.year() - 1, this.month());
+      return;
+    }
     const m = this.month() - 1;
     await (m < 1 ? this.goTo(this.year() - 1, 12) : this.goTo(this.year(), m));
   }
 
   async nextMonth(): Promise<void> {
+    if (this.vista() === 'anno') {
+      await this.goTo(this.year() + 1, this.month());
+      return;
+    }
     const m = this.month() + 1;
     await (m > 12 ? this.goTo(this.year() + 1, 1) : this.goTo(this.year(), m));
   }

@@ -81,6 +81,14 @@ class Reminder(Base):
     recurrence: Mapped[Recurrence] = mapped_column(
         Enum(Recurrence, native_enum=False, length=16), default=Recurrence.NONE
     )
+    #: Fino a quando si ripete. Quando c'è, le occorrenze non si generano una
+    #: alla volta alla chiusura: esistono tutte fin da subito, ognuna con il
+    #: proprio importo. È l'unico modo per farsi dire in anticipo quanto si
+    #: pagherà a marzo, e per vederle tutte sul calendario.
+    recurrence_until: Mapped[date | None] = mapped_column(Date, default=None)
+    #: Lega fra loro le occorrenze nate insieme, per poterle trattare come una
+    #: cosa sola — sapere che questa è "la terza di dodici", cancellarle tutte.
+    series_id: Mapped[str | None] = mapped_column(String(36), default=None, index=True)
     amount: Mapped[float | None] = mapped_column(Float, default=None)
     owner: Mapped[str | None] = mapped_column(String(120), default=None)
     reference: Mapped[str | None] = mapped_column(String(120), default=None)

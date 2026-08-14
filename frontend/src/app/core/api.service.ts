@@ -5,14 +5,19 @@ import { Observable } from 'rxjs';
 import {
   AppNotification,
   AppSettings,
+  AttentionState,
   CalendarMonth,
   CalendarQuery,
+  CalendarYear,
   ImportMapping,
   ImportPreview,
+  Occurrence,
   ImportResult,
   NotificationCounts,
   PushSubscriptionInfo,
+  Recurrence,
   Reminder,
+  ReminderKind,
   ReminderPage,
   ReminderQuery,
   ReminderStats,
@@ -73,6 +78,24 @@ export class ApiService {
     return this.http.get<CalendarMonth>(`${BASE}/reminders/calendar`, { params });
   }
 
+  /** L'anno intero come conteggi per giorno, per la vista a dodici mesi. */
+  calendarYear(year: number, kind?: ReminderKind | '', includeDone = true): Observable<CalendarYear> {
+    const params = this.toParams({ year, kind }).set('include_done', includeDone);
+    return this.http.get<CalendarYear>(`${BASE}/reminders/calendar/year`, { params });
+  }
+
+  /** Le date in cui una ricorrenza si ripresenterà, prima di salvarla. */
+  occurrences(query: {
+    due_date: string;
+    recurrence: Recurrence;
+    recurrence_until?: string | null;
+    amount?: number | null;
+  }): Observable<Occurrence[]> {
+    return this.http.get<Occurrence[]>(`${BASE}/reminders/occurrences`, {
+      params: this.toParams(query),
+    });
+  }
+
   upcoming(days = 30, limit = 50): Observable<Reminder[]> {
     return this.http.get<Reminder[]>(`${BASE}/reminders/upcoming`, {
       params: new HttpParams().set('days', days).set('limit', limit),
@@ -99,8 +122,10 @@ export class ApiService {
     return this.http.post<Reminder>(`${BASE}/reminders/${id}/reopen`, {});
   }
 
-  deleteReminder(id: number): Observable<void> {
-    return this.http.delete<void>(`${BASE}/reminders/${id}`);
+  /** @param series elimina l'intera serie invece della sola occorrenza. */
+  deleteReminder(id: number, series = false): Observable<void> {
+    const params = series ? new HttpParams().set('series', true) : undefined;
+    return this.http.delete<void>(`${BASE}/reminders/${id}`, { params });
   }
 
   // ----------------------------------------------------------- notifiche
@@ -130,6 +155,17 @@ export class ApiService {
 
   markAllRead(): Observable<NotificationCounts> {
     return this.http.post<NotificationCounts>(`${BASE}/notifications/read-all`, {});
+  }
+
+  /** Avvisi imminenti consegnati e non ancora guardati. */
+  attention(): Observable<AttentionState> {
+    return this.http.get<AttentionState>(`${BASE}/notifications/attention`);
+  }
+
+  /** L'utente ha guardato: spegne la segnalazione sulla barra. */
+  attentionSeen(reminderId?: number): Observable<AttentionState> {
+    const params = reminderId === undefined ? undefined : new HttpParams().set('reminder_id', reminderId);
+    return this.http.post<AttentionState>(`${BASE}/notifications/attention/seen`, {}, { params });
   }
 
   // --------------------------------------------------------------- push

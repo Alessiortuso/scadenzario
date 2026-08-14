@@ -8,6 +8,12 @@ const { contextBridge, ipcRenderer } = require('electron');
  */
 contextBridge.exposeInMainWorld('promemoria', {
   isDesktop: true,
+  /**
+   * L'utente ha aperto l'elenco o la scheda di un promemoria: la
+   * segnalazione sulla barra può spegnersi subito, senza aspettare il
+   * prossimo giro di interrogazione del backend.
+   */
+  segnalaLettura: () => ipcRenderer.send('promemoria-guardati'),
   onNavigate: (callback) => {
     ipcRenderer.on('navigate', (_event, route) => callback(route));
     // Il processo principale può chiedere una rotta prima che l'interfaccia

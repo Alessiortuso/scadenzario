@@ -5,6 +5,9 @@
     @if (current(); as r) {
       <p class="muted small">
         Stato: <strong>{{ r.status === 'open' ? 'aperto' : r.status === 'done' ? 'completato' : 'annullato' }}</strong>
+        @if (r.series_position; as pos) {
+          · occorrenza <strong>{{ pos[0] }} di {{ pos[1] }}</strong>
+        }
         · fonte: {{ r.source }}
         @if (r.external_id) { · id esterno: {{ r.external_id }} }
       </p>
@@ -19,6 +22,9 @@
         <button class="btn" type="button" (click)="reopen()">Riapri</button>
       }
       <button class="btn btn-danger" type="button" (click)="remove()">Elimina</button>
+      @if (r.series_position) {
+        <button class="btn btn-danger" type="button" (click)="removeSeries()">Elimina serie</button>
+      }
     </div>
   }
 </header>
@@ -74,8 +80,21 @@
           <option value="semiannual">Semestrale</option>
           <option value="yearly">Annuale</option>
         </select>
-        <span class="small muted">Alla chiusura viene creata automaticamente l'occorrenza successiva.</span>
+        @if (!isRecurring()) {
+          <span class="small muted">Si ripete a intervalli regolari.</span>
+        }
       </div>
+
+      @if (isRecurring()) {
+        <div class="field">
+          <label for="recurrence_until">Si ripete fino al</label>
+          <input id="recurrence_until" type="date" formControlName="recurrence_until" />
+          <span class="small muted">
+            Lascia vuoto per una ricorrenza senza fine: l'occorrenza successiva nasce ogni volta
+            che chiudi quella corrente.
+          </span>
+        </div>
+      }
 
       <div class="field">
         <label for="amount">Importo (€)</label>
@@ -96,6 +115,53 @@
         <label for="description">Note</label>
         <textarea id="description" formControlName="description"></textarea>
       </div>
+
+      @if (occurrences().length > 1) {
+        <div class="field span-2 occorrenze">
+          <label>Occorrenze ({{ occurrences().length }})</label>
+          <span class="small muted">
+            Ogni occorrenza diventa un promemoria a sé, con il suo avviso. Se gli importi sono
+            diversi fra loro — come nelle rate di un finanziamento — puoi correggerli qui.
+          </span>
+
+          <div class="table-wrap">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Data</th>
+                  <th class="right">Importo (€)</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (o of occurrences(); track o.due_date; let i = $index) {
+                  <tr>
+                    <td class="muted">{{ i + 1 }}</td>
+                    <td class="nowrap">{{ o.due_date | date: 'dd/MM/yyyy' }}</td>
+                    <td class="right">
+                      <input
+                        class="importo"
+                        type="number"
+                        step="0.01"
+                        [value]="o.amount ?? ''"
+                        (change)="setImporto(i, $any($event.target).value)"
+                      />
+                    </td>
+                  </tr>
+                }
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="2" class="right muted">Totale</td>
+                  <td class="right"><strong>{{ totaleOccorrenze() | currency: 'EUR' }}</strong></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      } @else if (loadingOccurrences()) {
+        <p class="field span-2 small muted">Calcolo delle occorrenze…</p>
+      }
 
       <div class="field span-2">
         <label for="alert_offsets">Preavvisi personalizzati (giorni prima)</label>
@@ -132,7 +198,7 @@
                 {{ a.status === 'pending' ? 'programmato' : a.status === 'sent' ? 'inviato' : a.status }}
               </span>
               <span class="when">{{ a.scheduled_for | date: 'dd/MM/yyyy HH:mm' }}</span>
-              <span class="small muted">{{ a.title }}</span>
+              <span class="small muted">{{ preavviso(a) }}</span>
             </li>
           }
         </ul>

@@ -36,11 +36,13 @@ Due database con due ruoli distinti:
 - **Tre tipi di promemoria**: scadenza, appuntamento e «altro». Cambia il modo di leggerli — una scadenza «scade», un appuntamento no — e il testo degli avvisi segue di conseguenza
 - Anagrafica essenziale: titolo, data, **orario facoltativo** (solo appuntamenti e «altro»), importo, cliente/responsabile, riferimento, note
 - **Vista calendario mensile** in stile agenda: griglia lunedì → domenica, promemoria dentro ai giorni ordinati per ora e colorati per tipo, filtro per tipo, pannello del giorno e inserimento con la data già compilata
+- **Vista annuale**: dodici mesi in miniatura con un pallino sui giorni che hanno qualcosa; si clicca un giorno per aprirlo nel mese
 - **Preavvisi configurabili** (es. 30, 15, 7, 3, 1, 0 giorni prima) a livello globale o per singolo promemoria
 - **Solleciti dopo la data** ogni N giorni, con tetto massimo
 - **Avviso di recupero**: un promemoria inserito quando è già passato (o già dentro la finestra di preavviso) genera comunque un avviso immediato
-- **Ricorrenze**: mensile, trimestrale, semestrale, annuale — completandone uno viene creata automaticamente l'occorrenza successiva
+- **Ricorrenze**: mensile, trimestrale, semestrale, annuale. Senza data di fine l'occorrenza successiva nasce alla chiusura di quella corrente; indicando **fino a quando**, le occorrenze vengono create tutte insieme e ognuna può avere il proprio importo — le rate di un finanziamento raramente sono uguali. Le occorrenze di una serie si eliminano anche tutte in un colpo
 - **Canali di notifica** attivabili singolarmente: centro notifiche in-app, Web Push (desktop), email SMTP
+- **Segnalazione insistente**: un avviso ignorato per un promemoria imminente continua a farsi notare sulla barra delle applicazioni (lampeggio, bollino sul pulsante, bollino sull'icona nella tray) finché non si apre il promemoria o l'elenco. La soglia in giorni è impostabile, 0 la disattiva
 - **Importazione CSV/Excel** con riconoscimento automatico delle colonne, anteprima con validazione riga per riga e reimport idempotente (aggiorna, non duplica)
 - Dashboard con scaduti / oggi / 7 / 30 giorni, ripartizione per tipo, totale importi aperti
 

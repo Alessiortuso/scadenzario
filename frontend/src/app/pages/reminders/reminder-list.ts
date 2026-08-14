@@ -5,6 +5,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { ApiService } from '../../core/api.service';
+import { AttentionService } from '../../core/attention.service';
 import { KIND_LABELS, Reminder, ReminderKind, ReminderQuery, ReminderStatus } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { DueBadge } from '../../shared/due-badge';
@@ -23,6 +24,7 @@ export class ReminderListPage implements OnInit {
   private readonly api = inject(ApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly toasts = inject(ToastService);
+  private readonly attention = inject(AttentionService);
 
   readonly kindLabels = KIND_LABELS;
 
@@ -55,6 +57,9 @@ export class ReminderListPage implements OnInit {
     }
 
     await this.search();
+    // Aprire l'elenco vuol dire aver preso atto degli avvisi imminenti: la
+    // segnalazione sulla barra delle applicazioni si spegne.
+    void this.attention.segnalaGuardato();
   }
 
   private buildQuery(): ReminderQuery {

@@ -33,6 +33,12 @@ export interface Reminder {
   kind: ReminderKind;
   status: ReminderStatus;
   recurrence: Recurrence;
+  /** Fino a quando si ripete. Vuoto = ricorrenza aperta, senza fine. */
+  recurrence_until: string | null;
+  /** Lega fra loro le occorrenze nate insieme. */
+  series_id: string | null;
+  /** Posizione nella serie, es. [3, 12]. Solo leggendo il singolo promemoria. */
+  series_position: [number, number] | null;
   amount: number | null;
   owner: string | null;
   reference: string | null;
@@ -46,6 +52,24 @@ export interface Reminder {
   updated_at: string;
   days_left: number;
   is_overdue: boolean;
+}
+
+export interface Occurrence {
+  due_date: string;
+  amount: number | null;
+}
+
+export interface YearDay {
+  date: string;
+  deadline: number;
+  appointment: number;
+  other: number;
+  total: number;
+}
+
+export interface CalendarYear {
+  year: number;
+  days: YearDay[];
 }
 
 export interface ReminderPage {
@@ -105,6 +129,12 @@ export interface NotificationCounts {
   total: number;
 }
 
+export interface AttentionState {
+  count: number;
+  days: number;
+  title: string | null;
+}
+
 export interface AppSettings {
   channel_inapp: boolean;
   channel_push: boolean;
@@ -115,6 +145,8 @@ export interface AppSettings {
   daily_send_time: string;
   notify_emails: string[];
   quiet_until_next_day: boolean;
+  /** Entro quanti giorni un avviso ignorato continua a segnalarsi. 0 = mai. */
+  insistent_alert_days: number;
 }
 
 export interface SettingsRead extends AppSettings {

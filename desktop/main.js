@@ -41,6 +41,11 @@ let pollTimer = null;
 let quitting = false;
 let interfacciaPronta = false;
 let rottaInAttesa = null;
+//: Misura dell'icona della tray su questo schermo: serve a ridisegnarla con e
+//: senza bollino senza ricalcolare ogni volta il fattore di scala.
+let dimensioneTray = 16;
+//: Ultimo stato applicato, per non ripetere lo stesso lavoro ogni mezzo minuto.
+let segnalazione = { accesa: false, count: 0 };
 
 //: Schemi riconosciuti nei collegamenti delle notifiche. Quelli `scadenzario://`
 //: restano validi: un toast mostrato prima dell'aggiornamento è ancora sullo
@@ -132,8 +137,8 @@ async function waitForBackend(timeoutMs = 60_000) {
 
 // ---------------------------------------------------------------- finestra
 
-function iconPath() {
-  const file = path.join(__dirname, 'assets', 'icon.ico');
+function iconPath(avviso = false) {
+  const file = path.join(__dirname, 'assets', avviso ? 'icon-avviso.ico' : 'icon.ico');
   return fs.existsSync(file) ? file : undefined;
 }
 
@@ -170,8 +175,8 @@ function icoRepresentation(file, wanted) {
   return image.isEmpty() ? null : image;
 }
 
-function iconImage(wanted) {
-  const file = iconPath();
+function iconImage(wanted, avviso = false) {
+  const file = iconPath(avviso) || iconPath();
   if (!file) return nativeImage.createEmpty();
   return icoRepresentation(file, wanted) || nativeImage.createFromPath(file);
 }
@@ -205,6 +210,10 @@ function createWindow() {
       interfacciaPronta = false;
     }
   });
+
+  // Tornando sulla finestra il quadro può essere cambiato: si ricontrolla,
+  // così il bollino non resta acceso su avvisi già guardati altrove.
+  mainWindow.on('focus', () => void aggiornaSegnalazione());
 
   // La X chiude solo la finestra: l'app resta in tray e continua ad avvisare.
   mainWindow.on('close', (event) => {
@@ -263,6 +272,8 @@ function showWindow(route) {
   }
 }
 
+ipcMain.on('promemoria-guardati', () => void aggiornaSegnalazione());
+
 ipcMain.on('interfaccia-pronta', (event) => {
   if (mainWindow === null || event.sender !== mainWindow.webContents) return;
   interfacciaPronta = true;
@@ -274,7 +285,8 @@ ipcMain.on('interfaccia-pronta', (event) => {
 
 function createTray() {
   const { scaleFactor } = screen.getPrimaryDisplay();
-  tray = new Tray(iconImage(Math.round(16 * scaleFactor)));
+  dimensioneTray = Math.round(16 * scaleFactor);
+  tray = new Tray(iconImage(dimensioneTray));
   tray.setToolTip('Promemoria');
   tray.setContextMenu(
     Menu.buildFromTemplate([
@@ -386,6 +398,65 @@ function reminderToastXml(item) {
 }
 
 /**
+ * Accende o spegne la segnalazione sulla barra delle applicazioni.
+ *
+ * Un toast si può ignorare con un clic, e a quel punto sparisce per sempre:
+ * chi stava facendo altro perde l'avviso senza accorgersene. Finché resta
+ * qualcosa di imminente che nessuno ha guardato, l'applicazione continua a
+ * dirlo — in modo discreto ma presente.
+ *
+ * Tre segnali diversi perché tre sono i posti in cui l'app può trovarsi:
+ *
+ *  - il **lampeggio** del pulsante attira l'occhio, ma solo se la finestra
+ *    non è già davanti: farlo lampeggiare mentre ci si sta lavorando sarebbe
+ *    solo fastidio;
+ *  - il **bollino** sul pulsante resta anche dopo che il lampeggio è finito,
+ *    ed è quello che sopravvive finché non si guarda davvero;
+ *  - l'**icona nella tray** col bollino copre il caso in cui la finestra è
+ *    chiusa: lì il pulsante sulla barra non esiste proprio, e senza questa
+ *    non resterebbe alcun segno.
+ */
+function applicaSegnalazione(count, titolo) {
+  const accesa = count > 0;
+  const cambiata = accesa !== segnalazione.accesa || count !== segnalazione.count;
+  segnalazione = { accesa, count };
+
+  if (tray !== null && cambiata) {
+    tray.setImage(iconImage(dimensioneTray, accesa));
+    tray.setToolTip(
+      accesa
+        ? `Promemoria — ${count === 1 ? '1 avviso' : `${count} avvisi`} da guardare`
+        : 'Promemoria',
+    );
+  }
+
+  if (mainWindow === null) return;
+
+  const bollino = path.join(__dirname, 'assets', 'badge.png');
+  if (accesa && fs.existsSync(bollino)) {
+    mainWindow.setOverlayIcon(nativeImage.createFromPath(bollino), titolo || 'Avvisi da guardare');
+  } else {
+    mainWindow.setOverlayIcon(null, '');
+  }
+
+  // Il lampeggio si chiede solo a finestra non in primo piano: Windows lo
+  // interrompe da sé appena la finestra viene attivata.
+  mainWindow.flashFrame(accesa && !mainWindow.isFocused());
+}
+
+/** Chiede al backend se c'è qualcosa di imminente rimasto senza risposta. */
+async function aggiornaSegnalazione() {
+  try {
+    const res = await fetch(`${BASE_URL}/api/notifications/attention`);
+    if (!res.ok) return;
+    const stato = await res.json();
+    applicaSegnalazione(stato.count, stato.title);
+  } catch (err) {
+    // Backend non ancora pronto o in riavvio: si riprova al giro successivo.
+  }
+}
+
+/**
  * Chiede al backend gli avvisi consegnati e non ancora mostrati su questa
  * postazione, ne mostra il toast nativo e li marca come mostrati.
  */
@@ -415,6 +486,8 @@ async function pollNotifications() {
   } catch (err) {
     console.error('Lettura notifiche fallita:', err);
   }
+
+  await aggiornaSegnalazione();
 }
 
 function startPolling() {

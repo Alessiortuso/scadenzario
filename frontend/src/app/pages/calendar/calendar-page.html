@@ -12,6 +12,25 @@
     <strong class="month-label">{{ monthLabel() }}</strong>
     <button class="btn btn-sm" type="button" (click)="nextMonth()" aria-label="Mese successivo">→</button>
     <button class="btn btn-sm" type="button" (click)="goToday()">Oggi</button>
+
+    <div class="vista">
+      <button
+        class="btn btn-sm"
+        type="button"
+        [class.attiva]="vista() === 'mese'"
+        (click)="cambiaVista('mese')"
+      >
+        Mese
+      </button>
+      <button
+        class="btn btn-sm"
+        type="button"
+        [class.attiva]="vista() === 'anno'"
+        (click)="cambiaVista('anno')"
+      >
+        Anno
+      </button>
+    </div>
   </div>
 
   <div class="filters">
@@ -32,6 +51,48 @@
   </div>
 </div>
 
+@if (vista() === 'anno') {
+  <div class="card anno" [class.loading]="loading()">
+    <div class="mesi">
+      @for (m of mesiDellAnno(); track m.mese) {
+        <div class="mese">
+          <button class="nome" type="button" (click)="apriMese(m.mese)">{{ m.nome }}</button>
+          <div class="intestazione">
+            @for (g of giorniSettimana; track g) {
+              <span>{{ g.charAt(0) }}</span>
+            }
+          </div>
+          <div class="giorni">
+            @for (c of m.caselle; track $index) {
+              @if (c.data === null) {
+                <span class="vuota"></span>
+              } @else {
+                <button
+                  class="giorno"
+                  type="button"
+                  [class.oggi]="c.data === todayIso"
+                  [class.pieno]="c.conteggi !== null"
+                  [title]="c.conteggi ? c.conteggi.total + ' in questo giorno' : c.data"
+                  (click)="apriGiorno(c)"
+                >
+                  {{ c.giorno }}
+                  @if (c.conteggi; as n) {
+                    <span class="pallino" [style.background]="coloreGiorno(n)"></span>
+                  }
+                </button>
+              }
+            }
+          </div>
+        </div>
+      }
+    </div>
+
+    <p class="small muted legenda">
+      Un pallino per ogni giorno che ha qualcosa; il colore è quello del tipo più importante.
+      Clicca un giorno per aprirlo nel mese.
+    </p>
+  </div>
+} @else {
 <div class="calendar-layout" [class.with-panel]="selected() !== null">
   <div class="card calendar" [class.loading]="loading()">
     <div class="weekdays">
@@ -125,3 +186,4 @@
     </aside>
   }
 </div>
+}

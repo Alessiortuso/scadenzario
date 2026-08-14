@@ -56,6 +56,20 @@
   font-weight: 600;
 }
 
+.occorrenze .table-wrap {
+  margin-top: 0.5rem;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.occorrenze .importo {
+  width: 8rem;
+  text-align: right;
+}
+.occorrenze tfoot td {
+  border-top: 1px solid var(--border);
+  padding-top: 0.4rem;
+}
+
 .form-actions {
   display: flex;
   gap: 0.6rem;

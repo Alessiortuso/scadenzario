@@ -1,19 +1,20 @@
-import { DatePipe } from '@angular/common';
+import { CurrencyPipe, DatePipe } from '@angular/common';
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { ApiService } from '../../core/api.service';
+import { AttentionService } from '../../core/attention.service';
 import { describeError } from '../../core/describe-error';
-import { AppNotification, Reminder, ReminderKind } from '../../core/models';
+import { AppNotification, Occurrence, Reminder, ReminderKind } from '../../core/models';
 import { NotificationStore } from '../../core/notification.store';
 import { ToastService } from '../../core/toast.service';
 import { KindIcon } from '../../shared/kind-icon';
 
 @Component({
   selector: 'app-reminder-form',
-  imports: [ReactiveFormsModule, RouterLink, DatePipe, KindIcon],
+  imports: [ReactiveFormsModule, RouterLink, DatePipe, CurrencyPipe, KindIcon],
   templateUrl: './reminder-form.html',
   styleUrl: './reminder-form.scss',
 })
@@ -24,6 +25,7 @@ export class ReminderFormPage implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly toasts = inject(ToastService);
   private readonly notifications = inject(NotificationStore);
+  private readonly attention = inject(AttentionService);
 
   /** Popolato dal router per la rotta /promemoria/:id. */
   readonly id = input<string | undefined>();
@@ -41,6 +43,7 @@ export class ReminderFormPage implements OnInit {
     due_date: ['', Validators.required],
     start_time: [''],
     recurrence: ['none'],
+    recurrence_until: [''],
     amount: this.fb.control<number | null>(null),
     owner: [''],
     reference: [''],
@@ -59,7 +62,33 @@ export class ReminderFormPage implements OnInit {
   /** Una scadenza cade in un giorno, non a un'ora: il campo non la riguarda. */
   readonly showTime = computed(() => this.kind() !== 'deadline');
 
+  /** Ricorrenza scelta ora, per far comparire i campi che la riguardano. */
+  readonly recurrence = signal<Reminder['recurrence']>('none');
+  readonly isRecurring = computed(() => this.recurrence() !== 'none');
+
+  /** Le occorrenze della serie, con l'importo modificabile una per una. */
+  readonly occurrences = signal<Occurrence[]>([]);
+  readonly loadingOccurrences = signal(false);
+
+  readonly totaleOccorrenze = computed(() =>
+    this.occurrences().reduce((somma, o) => somma + (o.amount ?? 0), 0),
+  );
+
   async ngOnInit(): Promise<void> {
+    this.form.controls.recurrence.valueChanges.subscribe((r) => {
+      this.recurrence.set(r as Reminder['recurrence']);
+      if (r === 'none') {
+        this.form.controls.recurrence_until.setValue('');
+        this.occurrences.set([]);
+      } else {
+        void this.aggiornaOccorrenze();
+      }
+    });
+
+    // Le occorrenze dipendono anche da data e importo di partenza.
+    this.form.controls.recurrence_until.valueChanges.subscribe(() => void this.aggiornaOccorrenze());
+    this.form.controls.due_date.valueChanges.subscribe(() => void this.aggiornaOccorrenze());
+
     this.form.controls.kind.valueChanges.subscribe((k) => {
       const kind = k as ReminderKind;
       this.kind.set(kind);
@@ -84,6 +113,7 @@ export class ReminderFormPage implements OnInit {
           // L'input orario vuole "HH:MM": con i secondi resta vuoto.
           start_time: reminder.start_time ? reminder.start_time.slice(0, 5) : '',
           recurrence: reminder.recurrence,
+          recurrence_until: reminder.recurrence_until ?? '',
           amount: reminder.amount,
           owner: reminder.owner ?? '',
           reference: reminder.reference ?? '',
@@ -92,6 +122,8 @@ export class ReminderFormPage implements OnInit {
           notify_emails: (reminder.notify_emails ?? []).join(', '),
         });
         this.alerts.set(await firstValueFrom(this.api.reminderNotifications(id)));
+        // Il promemoria è stato aperto: il suo avviso ha fatto il suo lavoro.
+        void this.attention.segnalaGuardato(id);
       } else {
         // Arrivando da un giorno del calendario la data è già decisa: chiederla
         // di nuovo sarebbe farla scegliere due volte.
@@ -107,6 +139,51 @@ export class ReminderFormPage implements OnInit {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  /**
+   * Chiede al server dove cadranno le occorrenze e prepara la tabella.
+   *
+   * Il calcolo delle date resta di là — mesi corti, fine mese, tetto massimo —
+   * invece di essere riscritto qui e divergere alla prima differenza.
+   *
+   * Gli importi già digitati si conservano: cambiare la data di fine per
+   * aggiungere una rata non deve cancellare le cifre inserite a mano.
+   */
+  private async aggiornaOccorrenze(): Promise<void> {
+    const raw = this.form.getRawValue();
+    if (raw.recurrence === 'none' || !raw.recurrence_until || !raw.due_date) {
+      this.occurrences.set([]);
+      return;
+    }
+
+    this.loadingOccurrences.set(true);
+    try {
+      const gia = new Map(this.occurrences().map((o) => [o.due_date, o.amount]));
+      const calcolate = await firstValueFrom(
+        this.api.occurrences({
+          due_date: raw.due_date,
+          recurrence: raw.recurrence as Reminder['recurrence'],
+          recurrence_until: raw.recurrence_until,
+          amount: raw.amount === null || String(raw.amount) === '' ? null : Number(raw.amount),
+        }),
+      );
+      this.occurrences.set(
+        calcolate.map((o) => ({ ...o, amount: gia.has(o.due_date) ? gia.get(o.due_date)! : o.amount })),
+      );
+    } catch {
+      this.occurrences.set([]);
+    } finally {
+      this.loadingOccurrences.set(false);
+    }
+  }
+
+  /** Importo di una singola occorrenza, digitato nella tabella. */
+  setImporto(indice: number, valore: string): void {
+    const importo = valore.trim() === '' ? null : Number(valore);
+    this.occurrences.update((elenco) =>
+      elenco.map((o, i) => (i === indice ? { ...o, amount: Number.isFinite(importo!) ? importo : null } : o)),
+    );
   }
 
   private payload(): Partial<Reminder> {
@@ -131,6 +208,7 @@ export class ReminderFormPage implements OnInit {
       due_date: raw.due_date,
       start_time: raw.start_time || null,
       recurrence: raw.recurrence as Reminder['recurrence'],
+      recurrence_until: raw.recurrence_until || null,
       amount: raw.amount === null || String(raw.amount) === '' ? null : Number(raw.amount),
       owner: raw.owner.trim() || null,
       reference: raw.reference.trim() || null,
@@ -138,6 +216,27 @@ export class ReminderFormPage implements OnInit {
       alert_offsets: offsets.length ? offsets : null,
       notify_emails: emails.length ? emails : null,
     };
+  }
+
+  /** Come si colloca un avviso rispetto alla data del promemoria.
+   *
+   * Non si mostra il titolo della notifica: quello è scritto dal punto di
+   * vista del giorno in cui partirà («Tra 7 giorni»), e letto oggi accanto a
+   * una data del 2027 sembra semplicemente sbagliato. Qui serve la distanza
+   * dalla scadenza, che è quello che si è impostato.
+   *
+   * `offset_days` è positivo per i preavvisi, negativo per i solleciti.
+   */
+  preavviso(avviso: AppNotification): string {
+    const giorni = avviso.offset_days;
+    if (giorni > 0) {
+      return giorni === 1 ? 'il giorno prima' : `${giorni} giorni prima`;
+    }
+    if (giorni === 0) {
+      return 'il giorno stesso';
+    }
+    const dopo = Math.abs(giorni);
+    return dopo === 1 ? 'il giorno dopo' : `${dopo} giorni dopo`;
   }
 
   async save(): Promise<void> {
@@ -148,9 +247,14 @@ export class ReminderFormPage implements OnInit {
     this.saving.set(true);
     try {
       const existing = this.current();
+      // Gli importi per occorrenza valgono solo alla creazione: dopo, ogni
+      // occorrenza è un promemoria a sé e si modifica dalla sua scheda.
+      const corpo = existing
+        ? this.payload()
+        : { ...this.payload(), occurrences: this.occurrences() };
       const saved = existing
         ? await firstValueFrom(this.api.updateReminder(existing.id, this.payload()))
-        : await firstValueFrom(this.api.createReminder(this.payload()));
+        : await firstValueFrom(this.api.createReminder(corpo));
       this.toasts.success(existing ? 'Promemoria aggiornato' : 'Promemoria creato');
       void this.notifications.refresh();
       if (existing) {
@@ -196,6 +300,21 @@ export class ReminderFormPage implements OnInit {
     }
     await firstValueFrom(this.api.deleteReminder(reminder.id));
     this.toasts.show('Promemoria eliminato');
+    void this.router.navigate(['/promemoria']);
+  }
+
+  /** Disdire l'intera rateizzazione, invece di cancellarne dodici a mano. */
+  async removeSeries(): Promise<void> {
+    const reminder = this.current();
+    const posizione = reminder?.series_position;
+    if (!reminder || !posizione) {
+      return;
+    }
+    if (!confirm(`Eliminare tutte le ${posizione[1]} occorrenze di «${reminder.title}»?`)) {
+      return;
+    }
+    await firstValueFrom(this.api.deleteReminder(reminder.id, true));
+    this.toasts.show(`Serie eliminata: ${posizione[1]} occorrenze`);
     void this.router.navigate(['/promemoria']);
   }
 }
