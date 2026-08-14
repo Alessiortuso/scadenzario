@@ -3,7 +3,8 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 
 import { ApiService } from '../../core/api.service';
-import { ImportMapping, ImportPreview, ImportResult } from '../../core/models';
+import { describeError } from '../../core/describe-error';
+import { ImportMapping, ImportPreview, ImportResult, ReminderKind } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 
 interface FieldSpec {
@@ -14,12 +15,11 @@ interface FieldSpec {
 
 const FIELDS: FieldSpec[] = [
   { key: 'title', label: 'Titolo', required: true },
-  { key: 'due_date', label: 'Data di scadenza', required: true },
+  { key: 'due_date', label: 'Data', required: true },
   { key: 'description', label: 'Note / descrizione', required: false },
   { key: 'amount', label: 'Importo', required: false },
   { key: 'owner', label: 'Cliente / responsabile', required: false },
   { key: 'reference', label: 'Riferimento', required: false },
-  { key: 'category', label: 'Categoria', required: false },
   { key: 'external_id', label: 'ID esterno (per aggiornare senza duplicare)', required: false },
 ];
 
@@ -38,6 +38,7 @@ export class ImportPage {
   readonly file = signal<File | null>(null);
   readonly preview = signal<ImportPreview | null>(null);
   readonly mapping = signal<Record<string, string>>({});
+  readonly kind = signal<ReminderKind>('deadline');
   readonly source = signal('import');
   readonly dateFormat = signal('');
   readonly busy = signal(false);
@@ -60,7 +61,7 @@ export class ImportPage {
       this.mapping.set({ ...preview.suggested_mapping });
       this.source.set(file.name.replace(/\.[^.]+$/, '').slice(0, 40) || 'import');
     } catch (err) {
-      this.toasts.error('Lettura del file non riuscita: ' + describe(err));
+      this.toasts.error('Lettura del file non riuscita: ' + describeError(err));
     } finally {
       this.busy.set(false);
     }
@@ -86,6 +87,7 @@ export class ImportPage {
   private buildMapping(): ImportMapping {
     return {
       ...(this.mapping() as unknown as ImportMapping),
+      kind: this.kind(),
       source: this.source().trim() || 'import',
       date_format: this.dateFormat().trim() || null,
     };
@@ -100,7 +102,7 @@ export class ImportPage {
     try {
       this.preview.set(await firstValueFrom(this.api.importPreview(file, this.buildMapping())));
     } catch (err) {
-      this.toasts.error('Anteprima non riuscita: ' + describe(err));
+      this.toasts.error('Anteprima non riuscita: ' + describeError(err));
     } finally {
       this.busy.set(false);
     }
@@ -115,9 +117,9 @@ export class ImportPage {
     try {
       const result = await firstValueFrom(this.api.importApply(file, this.buildMapping()));
       this.result.set(result);
-      this.toasts.success(`Import completato: ${result.created} create, ${result.updated} aggiornate`);
+      this.toasts.success(`Import completato: ${result.created} creati, ${result.updated} aggiornati`);
     } catch (err) {
-      this.toasts.error('Import non riuscito: ' + describe(err));
+      this.toasts.error('Import non riuscito: ' + describeError(err));
     } finally {
       this.busy.set(false);
     }
@@ -127,9 +129,4 @@ export class ImportPage {
     const value = row[key];
     return value === null || value === undefined || value === '' ? '—' : String(value);
   }
-}
-
-function describe(err: unknown): string {
-  const detail = (err as { error?: { detail?: unknown } })?.error?.detail;
-  return typeof detail === 'string' ? detail : 'errore imprevisto';
 }

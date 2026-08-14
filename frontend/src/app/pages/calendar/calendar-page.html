@@ -1,0 +1,127 @@
+<header class="page-head">
+  <div>
+    <h1>Calendario</h1>
+    <p class="muted">Scadenze e appuntamenti del mese, giorno per giorno.</p>
+  </div>
+  <a class="btn btn-primary" routerLink="/promemoria/nuovo">+ Nuovo promemoria</a>
+</header>
+
+<div class="card toolbar-card">
+  <div class="month-nav">
+    <button class="btn btn-sm" type="button" (click)="previousMonth()" aria-label="Mese precedente">←</button>
+    <strong class="month-label">{{ monthLabel() }}</strong>
+    <button class="btn btn-sm" type="button" (click)="nextMonth()" aria-label="Mese successivo">→</button>
+    <button class="btn btn-sm" type="button" (click)="goToday()">Oggi</button>
+  </div>
+
+  <div class="filters">
+    <div class="field">
+      <label for="kind">Tipo</label>
+      <select id="kind" [(ngModel)]="kind" (change)="load()">
+        <option value="">Tutti</option>
+        <option value="deadline">Scadenze</option>
+        <option value="appointment">Appuntamenti</option>
+        <option value="other">Altro</option>
+      </select>
+    </div>
+
+    <label class="check">
+      <input type="checkbox" [(ngModel)]="includeDone" (change)="load()" />
+      <span>Mostra completati</span>
+    </label>
+  </div>
+</div>
+
+<div class="calendar-layout" [class.with-panel]="selected() !== null">
+  <div class="card calendar" [class.loading]="loading()">
+    <div class="weekdays">
+      @for (g of giorniSettimana; track g) {
+        <span>{{ g }}</span>
+      }
+    </div>
+
+    <div class="grid">
+      @for (week of weeks(); track $index) {
+        @for (day of week; track day.date) {
+          <div
+            class="day"
+            [class.outside]="!day.in_month"
+            [class.today]="isToday(day)"
+            [class.selected]="selected()?.date === day.date"
+            (click)="select(day)"
+          >
+            <div class="day-head">
+              <span class="number">{{ dayNumber(day) }}</span>
+              <button
+                class="add"
+                type="button"
+                (click)="newOn(day, $event)"
+                [attr.aria-label]="'Nuovo promemoria il ' + day.date"
+                title="Nuovo promemoria in questo giorno"
+              >
+                +
+              </button>
+            </div>
+
+            <div class="items">
+              @for (r of day.items.slice(0, maxPerGiorno); track r.id) {
+                <button
+                  class="item"
+                  type="button"
+                  [class.done]="r.status !== 'open'"
+                  [class.overdue]="r.is_overdue"
+                  (click)="open(r, $event)"
+                  [title]="kindLabels[r.kind] + ' — ' + r.title"
+                >
+                  <span class="dot" [style.background]="colorOf(r)"></span>
+                  @if (r.start_time) {
+                    <span class="hour">{{ r.start_time | timeLabel }}</span>
+                  }
+                  <span class="label">{{ r.title }}</span>
+                </button>
+              }
+              @if (day.items.length > maxPerGiorno) {
+                <span class="more">+{{ day.items.length - maxPerGiorno }} altri</span>
+              }
+            </div>
+          </div>
+        }
+      }
+    </div>
+  </div>
+
+  @if (selected(); as day) {
+    <aside class="card day-panel">
+      <header>
+        <strong>{{ day.date | date: 'EEEE d MMMM y' }}</strong>
+        <button class="btn btn-ghost btn-sm" type="button" (click)="selected.set(null)" aria-label="Chiudi">✕</button>
+      </header>
+
+      @if (day.items.length === 0) {
+        <p class="empty small">Niente in programma.</p>
+      } @else {
+        <ul class="day-list">
+          @for (r of day.items; track r.id) {
+            <li [class.done]="r.status !== 'open'">
+              <span class="dot" [style.background]="colorOf(r)"></span>
+              <div class="info">
+                <a [routerLink]="['/promemoria', r.id]">{{ r.title }}</a>
+                <span class="small muted">
+                  <app-kind-icon [kind]="r.kind" /> {{ kindLabels[r.kind] }}
+                  @if (r.start_time) { · {{ r.start_time | timeLabel }} }
+                </span>
+              </div>
+              @if (r.status === 'open') {
+                <button class="btn btn-sm" type="button" (click)="complete(r, $event)">Completa</button>
+              }
+            </li>
+          }
+        </ul>
+      }
+
+      <button class="btn btn-primary btn-sm add-here" type="button" (click)="newOn(day)">
+        + Aggiungi in questo giorno
+      </button>
+    </aside>
+  }
+</div>

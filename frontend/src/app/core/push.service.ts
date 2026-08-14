@@ -27,7 +27,7 @@ export class PushService {
   async init(): Promise<void> {
     // Nell'app desktop le notifiche le mostra Electron con le API native di
     // Windows: il Web Push non serve e non va proposto all'utente.
-    if ((window as unknown as { scadenzario?: { isDesktop?: boolean } }).scadenzario?.isDesktop) {
+    if ((window as unknown as { promemoria?: { isDesktop?: boolean } }).promemoria?.isDesktop) {
       this.state.set('native');
       return;
     }

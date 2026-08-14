@@ -58,7 +58,7 @@ def send_test(db: Session = Depends(get_local_db)) -> dict:
 
     payload = json.dumps(
         {
-            "title": "Scadenzario: notifica di prova",
+            "title": "Promemoria: notifica di prova",
             "body": "Se leggi questo messaggio le notifiche desktop funzionano.",
             "severity": "info",
             "url": "/",

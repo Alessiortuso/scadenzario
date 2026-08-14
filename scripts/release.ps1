@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Pubblica una nuova versione dello Scadenzario, e verifica che sia davvero pubblicabile.
+    Pubblica una nuova versione di Promemoria, e verifica che sia davvero pubblicabile.
 
 .DESCRIPTION
     Il giro completo: test, numero di versione, compilazione, tag, release, verifica.
@@ -58,7 +58,9 @@ $Frontend = Join-Path $RepoRoot "frontend"
 $Desktop = Join-Path $RepoRoot "desktop"
 $Python = Join-Path $Backend ".venv\Scripts\python.exe"
 $Tag = "v$Version"
-$Installer = Join-Path $Desktop "release\Scadenzario Setup $Version.exe"
+# Il nome dell'installer lo decide `productName` di electron-builder: si legge
+# di lì (vedi $ProductName più sotto) invece di ripeterlo qui, così un cambio
+# di nome dell'applicazione non lascia indietro questo script.
 
 # ------------------------------------------------------------------- utilità
 
@@ -135,7 +137,9 @@ function Test-Pubblicazione([string]$slug, [string]$tag, [string]$installer) {
     $r = Get-Release $slug $tag
     if (-not $r) { return "release non trovata" }
 
-    $attesi = @("Scadenzario-Setup-$Version.exe", "Scadenzario-Setup-$Version.exe.blockmap", "latest.yml")
+    # Negli asset di GitHub gli spazi diventano trattini.
+    $nomeAsset = "$($ProductName -replace ' ', '-')-Setup-$Version.exe"
+    $attesi = @($nomeAsset, "$nomeAsset.blockmap", "latest.yml")
     $presenti = $r.assets | ForEach-Object { $_.name }
     $mancanti = $attesi | Where-Object { $presenti -notcontains $_ }
     if ($mancanti) { return "file mancanti: $($mancanti -join ', ')" }
@@ -173,6 +177,8 @@ Set-Location $RepoRoot
 $pkg = Read-TestoUtf8 (Join-Path $Desktop "package.json") | ConvertFrom-Json
 $pubblicazione = $pkg.build.publish[0]
 $slug = "$($pubblicazione.owner)/$($pubblicazione.repo)"
+$ProductName = $pkg.build.productName
+$Installer = Join-Path $Desktop "release\$ProductName Setup $Version.exe"
 
 if ($VerifyOnly) {
     Write-Passo "Verifica della release $Tag (nessuna pubblicazione)"
@@ -278,12 +284,12 @@ try {
 Write-Passo "Compilazione backend impacchettato"
 Push-Location $Backend
 try {
-    Invoke-Comando "PyInstaller fallito" { & $Python -m PyInstaller scadenzario-backend.spec --noconfirm }
+    Invoke-Comando "PyInstaller fallito" { & $Python -m PyInstaller promemoria-backend.spec --noconfirm }
 } finally {
     Pop-Location
 }
 
-$migrazioni = Join-Path $Backend "dist\scadenzario-backend\_internal\alembic\versions"
+$migrazioni = Join-Path $Backend "dist\promemoria-backend\_internal\alembic\versions"
 if (-not (Test-Path $migrazioni)) {
     Stop-Con "Le migrazioni non sono finite nel pacchetto: l'app installata non partirebbe."
 }

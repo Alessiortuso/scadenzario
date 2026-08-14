@@ -1,28 +1,41 @@
-export type DeadlineStatus = 'open' | 'done' | 'cancelled';
-export type Priority = 'low' | 'normal' | 'high' | 'critical';
+export type ReminderStatus = 'open' | 'done' | 'cancelled';
+export type ReminderKind = 'deadline' | 'appointment' | 'other';
 export type Recurrence = 'none' | 'monthly' | 'quarterly' | 'semiannual' | 'yearly';
 export type NotificationStatus = 'pending' | 'sent' | 'failed' | 'cancelled';
 
-export interface Category {
-  id: number;
-  name: string;
-  color: string;
-  alert_offsets: number[] | null;
-}
+/** Etichette dei tipi, in un posto solo. */
+export const KIND_LABELS: Record<ReminderKind, string> = {
+  deadline: 'Scadenza',
+  appointment: 'Appuntamento',
+  other: 'Altro',
+};
 
-export interface Deadline {
+/** Il colore con cui un tipo si riconosce nel calendario.
+ *
+ * Serve solo a distinguere i pallini a colpo d'occhio, non a gridare: il rosso
+ * sta alle scadenze perché sono le uniche che possono farti perdere qualcosa.
+ */
+export const KIND_COLORS: Record<ReminderKind, string> = {
+  deadline: '#ef4444',
+  appointment: '#3b82f6',
+  other: '#94a3b8',
+};
+
+export const KIND_ORDER: ReminderKind[] = ['deadline', 'appointment', 'other'];
+
+export interface Reminder {
   id: number;
   title: string;
   description: string | null;
   due_date: string;
-  status: DeadlineStatus;
-  priority: Priority;
+  /** "HH:MM:SS", oppure null per un impegno di giornata. */
+  start_time: string | null;
+  kind: ReminderKind;
+  status: ReminderStatus;
   recurrence: Recurrence;
   amount: number | null;
   owner: string | null;
   reference: string | null;
-  category_id: number | null;
-  category: Category | null;
   alert_offsets: number[] | null;
   notify_emails: string[] | null;
   source: string;
@@ -35,21 +48,19 @@ export interface Deadline {
   is_overdue: boolean;
 }
 
-export interface DeadlinePage {
-  items: Deadline[];
+export interface ReminderPage {
+  items: Reminder[];
   total: number;
   page: number;
   page_size: number;
 }
 
-export interface CategoryStat {
-  category_id: number | null;
-  name: string;
-  color: string;
+export interface KindStat {
+  kind: ReminderKind;
   count: number;
 }
 
-export interface DeadlineStats {
+export interface ReminderStats {
   overdue: number;
   due_today: number;
   due_in_7_days: number;
@@ -57,12 +68,26 @@ export interface DeadlineStats {
   open_total: number;
   done_total: number;
   amount_open: number;
-  by_category: CategoryStat[];
+  by_kind: KindStat[];
+}
+
+export interface CalendarDay {
+  date: string;
+  in_month: boolean;
+  items: Reminder[];
+}
+
+export interface CalendarMonth {
+  year: number;
+  month: number;
+  grid_start: string;
+  grid_end: string;
+  days: CalendarDay[];
 }
 
 export interface AppNotification {
   id: number;
-  deadline_id: number;
+  reminder_id: number;
   offset_days: number;
   title: string;
   body: string;
@@ -122,11 +147,11 @@ export interface ImportPreview {
 export interface ImportMapping {
   title: string;
   due_date: string;
+  kind?: ReminderKind;
   description?: string | null;
   amount?: string | null;
   owner?: string | null;
   reference?: string | null;
-  category?: string | null;
   external_id?: string | null;
   date_format?: string | null;
   source: string;
@@ -159,14 +184,21 @@ export interface SetupPayload {
   email_sender_device: boolean;
 }
 
-export interface DeadlineQuery {
+export interface ReminderQuery {
   q?: string;
-  status?: DeadlineStatus | '';
-  category_id?: number | null;
+  status?: ReminderStatus | '';
+  kind?: ReminderKind | '';
   due_from?: string;
   due_to?: string;
   overdue_only?: boolean;
   page?: number;
   page_size?: number;
   sort?: string;
+}
+
+export interface CalendarQuery {
+  year: number;
+  month: number;
+  kind?: ReminderKind | '';
+  include_done?: boolean;
 }

@@ -4,9 +4,9 @@ import logging
 from datetime import datetime, timezone
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
-from ..models import Deadline, DeadlineStatus, Notification, NotificationStatus
+from ..models import Notification, NotificationStatus, Reminder, ReminderStatus
 from ..schemas import AppSettings
 from . import alerts, settings_service
 from .notifiers import NOTIFIERS
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 def dispatch_notification(
     local_db: Session,
     notification: Notification,
-    deadline: Deadline | None,
+    reminder: Reminder | None,
     app_settings: AppSettings,
 ) -> dict:
     results: dict[str, dict] = {}
@@ -28,7 +28,7 @@ def dispatch_notification(
             results[notifier.name] = {"ok": False, "detail": "canale disattivato"}
             continue
         try:
-            outcome = notifier.send(local_db, notification, deadline, app_settings)
+            outcome = notifier.send(local_db, notification, reminder, app_settings)
         except Exception as exc:  # pragma: no cover - difensivo
             logger.exception("Canale %s in errore", notifier.name)
             outcome_dict = {"ok": False, "detail": str(exc)[:300]}
@@ -50,27 +50,25 @@ def dispatch_due(shared_db: Session, local_db: Session, now: datetime | None = N
     if not pending:
         return {"processed": 0, "sent": 0, "failed": 0}
 
-    deadlines = {
-        d.id: d
-        for d in shared_db.scalars(
-            select(Deadline)
-            .options(selectinload(Deadline.category))
-            .where(Deadline.id.in_({n.deadline_id for n in pending}))
+    reminders = {
+        r.id: r
+        for r in shared_db.scalars(
+            select(Reminder).where(Reminder.id.in_({n.reminder_id for n in pending}))
         ).all()
     }
 
     sent = failed = obsolete = 0
     for notification in pending:
-        deadline = deadlines.get(notification.deadline_id)
-        # Nel frattempo un'altra postazione può aver evaso o eliminato la
-        # scadenza: in quel caso l'avviso non va consegnato.
-        if deadline is None or deadline.status != DeadlineStatus.OPEN:
+        reminder = reminders.get(notification.reminder_id)
+        # Nel frattempo un'altra postazione può aver evaso o eliminato il
+        # promemoria: in quel caso l'avviso non va consegnato.
+        if reminder is None or reminder.status != ReminderStatus.OPEN:
             notification.status = NotificationStatus.CANCELLED
-            notification.channel_results = {"motivo": "scadenza non più aperta"}
+            notification.channel_results = {"motivo": "promemoria non più aperto"}
             obsolete += 1
             continue
 
-        dispatch_notification(local_db, notification, deadline, app_settings)
+        dispatch_notification(local_db, notification, reminder, app_settings)
         if notification.status == NotificationStatus.SENT:
             sent += 1
         else:

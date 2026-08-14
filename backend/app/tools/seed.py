@@ -1,4 +1,4 @@
-"""Popola il database con categorie e scadenze di esempio.
+"""Popola il database con promemoria di esempio.
 
 Uso:
     python -m app.tools.seed
@@ -6,19 +6,12 @@ Uso:
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, time, timedelta
 
 from sqlalchemy import select
 
 from ..db import LocalSession, SharedSession, init_db
-from ..models import Category, Deadline, Priority, Recurrence
-
-CATEGORIES = [
-    ("Fiscale", "#ef4444", [30, 15, 7, 3, 1, 0]),
-    ("Contratti", "#6366f1", [60, 30, 15, 7, 0]),
-    ("Assicurazioni", "#0ea5e9", [45, 30, 15, 7, 1, 0]),
-    ("Certificazioni", "#22c55e", [90, 60, 30, 7, 0]),
-]
+from ..models import Recurrence, Reminder, ReminderKind
 
 
 def run() -> None:
@@ -26,37 +19,32 @@ def run() -> None:
     db = SharedSession()
     local_db = LocalSession()
     try:
-        by_name: dict[str, Category] = {}
-        for name, color, offsets in CATEGORIES:
-            category = db.scalar(select(Category).where(Category.name == name))
-            if category is None:
-                category = Category(name=name, color=color, alert_offsets=offsets)
-                db.add(category)
-            by_name[name] = category
-        db.flush()
-
         today = date.today()
+        D, A, O = ReminderKind.DEADLINE, ReminderKind.APPOINTMENT, ReminderKind.OTHER
         samples = [
-            ("Versamento IVA trimestrale", "Fiscale", today + timedelta(days=5), 4820.50, Recurrence.QUARTERLY, Priority.HIGH),
-            ("Rinnovo polizza RC professionale", "Assicurazioni", today + timedelta(days=21), 1250.00, Recurrence.YEARLY, Priority.NORMAL),
-            ("Scadenza contratto fornitore Rossi Srl", "Contratti", today + timedelta(days=45), None, Recurrence.NONE, Priority.NORMAL),
-            ("Rinnovo certificazione ISO 9001", "Certificazioni", today + timedelta(days=95), 3000.00, Recurrence.YEARLY, Priority.HIGH),
-            ("Modello F24 dipendenti", "Fiscale", today + timedelta(days=1), 7310.20, Recurrence.MONTHLY, Priority.CRITICAL),
-            ("Visita medica periodica addetti", "Certificazioni", today - timedelta(days=4), None, Recurrence.YEARLY, Priority.HIGH),
+            ("Versamento IVA trimestrale", today + timedelta(days=5), None, D, 4820.50, Recurrence.QUARTERLY),
+            ("Rinnovo polizza RC professionale", today + timedelta(days=21), None, D, 1250.00, Recurrence.YEARLY),
+            ("Scadenza contratto fornitore Rossi Srl", today + timedelta(days=45), None, D, None, Recurrence.NONE),
+            ("Rinnovo certificazione ISO 9001", today + timedelta(days=95), None, D, 3000.00, Recurrence.YEARLY),
+            ("Modello F24 dipendenti", today + timedelta(days=1), None, D, 7310.20, Recurrence.MONTHLY),
+            ("Visita medica periodica addetti", today - timedelta(days=4), time(9, 0), A, None, Recurrence.YEARLY),
+            ("Riunione con il commercialista", today + timedelta(days=3), time(15, 30), A, None, Recurrence.NONE),
+            ("Sopralluogo cantiere via Verdi", today + timedelta(days=8), time(10, 0), A, None, Recurrence.NONE),
+            ("Preparare documenti per il revisore", today + timedelta(days=12), None, O, None, Recurrence.NONE),
         ]
 
         created = 0
-        for title, category_name, due, amount, recurrence, priority in samples:
-            if db.scalar(select(Deadline).where(Deadline.title == title, Deadline.due_date == due)):
+        for title, due, start, kind, amount, recurrence in samples:
+            if db.scalar(select(Reminder).where(Reminder.title == title, Reminder.due_date == due)):
                 continue
             db.add(
-                Deadline(
+                Reminder(
                     title=title,
                     due_date=due,
+                    start_time=start,
+                    kind=kind,
                     amount=amount,
                     recurrence=recurrence,
-                    priority=priority,
-                    category_id=by_name[category_name].id,
                     owner="Amministrazione",
                     source="seed",
                 )
@@ -67,7 +55,7 @@ def run() -> None:
         from ..services import alerts
 
         generated = alerts.sync_all(db, local_db)
-        print(f"Categorie pronte: {len(by_name)} | scadenze create: {created} | avvisi generati: {generated}")
+        print(f"Promemoria creati: {created} | avvisi generati: {generated}")
     finally:
         local_db.close()
         db.close()

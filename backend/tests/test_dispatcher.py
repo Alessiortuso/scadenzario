@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from sqlalchemy import select
 
-from app.models import DeadlineStatus, Notification, NotificationStatus
+from app.models import ReminderStatus, Notification, NotificationStatus
 from app.services import dispatcher, settings_service
 
 
@@ -17,9 +17,9 @@ def _prepara(shared_db, app_settings):
     settings_service.save_settings(shared_db, app_settings)
 
 
-def test_un_avviso_dovuto_viene_consegnato(shared_db, local_db, make_deadline, app_settings):
+def test_un_avviso_dovuto_viene_consegnato(shared_db, local_db, make_reminder, app_settings):
     _prepara(shared_db, app_settings)
-    make_deadline(-1, alert_offsets=[0])
+    make_reminder(-1, alert_offsets=[0])
 
     esito = dispatcher.run_cycle(shared_db, local_db)
 
@@ -32,9 +32,9 @@ def test_un_avviso_dovuto_viene_consegnato(shared_db, local_db, make_deadline, a
     assert all(n.channel_results["inapp"]["ok"] for n in consegnate)
 
 
-def test_un_avviso_non_viene_consegnato_due_volte(shared_db, local_db, make_deadline, app_settings):
+def test_un_avviso_non_viene_consegnato_due_volte(shared_db, local_db, make_reminder, app_settings):
     _prepara(shared_db, app_settings)
-    make_deadline(-1, alert_offsets=[0])
+    make_reminder(-1, alert_offsets=[0])
 
     primo = dispatcher.run_cycle(shared_db, local_db)
     secondo = dispatcher.run_cycle(shared_db, local_db)
@@ -43,18 +43,18 @@ def test_un_avviso_non_viene_consegnato_due_volte(shared_db, local_db, make_dead
     assert secondo["sent"] == 0
 
 
-def test_scadenza_evasa_altrove_annulla_l_avviso(shared_db, local_db, make_deadline, app_settings):
+def test_scadenza_evasa_altrove_annulla_l_avviso(shared_db, local_db, make_reminder, app_settings):
     """La scadenza viene chiusa da un'altra postazione dopo che l'avviso è
     stato generato: non deve più essere consegnato."""
     _prepara(shared_db, app_settings)
-    deadline = make_deadline(-1, alert_offsets=[0])
+    reminder = make_reminder(-1, alert_offsets=[0])
 
     from app.services import alerts
 
-    alerts.sync_deadline_notifications(local_db, deadline, app_settings)
+    alerts.sync_reminder_notifications(local_db, reminder, app_settings)
     assert local_db.scalars(select(Notification)).all()
 
-    deadline.status = DeadlineStatus.DONE
+    reminder.status = ReminderStatus.DONE
     shared_db.commit()
 
     esito = dispatcher.dispatch_due(shared_db, local_db)
@@ -69,9 +69,9 @@ def test_scadenza_evasa_altrove_annulla_l_avviso(shared_db, local_db, make_deadl
     assert NotificationStatus.CANCELLED in stati
 
 
-def test_un_canale_in_errore_non_blocca_gli_altri(shared_db, local_db, make_deadline, app_settings, monkeypatch):
+def test_un_canale_in_errore_non_blocca_gli_altri(shared_db, local_db, make_reminder, app_settings, monkeypatch):
     _prepara(shared_db, app_settings)
-    make_deadline(-1, alert_offsets=[0])
+    make_reminder(-1, alert_offsets=[0])
 
     class CanaleRotto:
         name = "rotto"

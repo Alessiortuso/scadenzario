@@ -21,7 +21,7 @@
       @if (store.loading() && store.items().length === 0) {
         <p class="empty small">Caricamento…</p>
       } @else if (store.items().length === 0) {
-        <p class="empty small">Nessuna notifica. Gli avvisi compaiono qui quando una scadenza si avvicina.</p>
+        <p class="empty small">Nessuna notifica. Gli avvisi compaiono qui quando un promemoria si avvicina.</p>
       } @else {
         @for (n of store.items(); track n.id) {
           <button class="item" type="button" [class.unread]="!n.read_at" (click)="openNotification(n)">

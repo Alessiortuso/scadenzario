@@ -9,7 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from ..db import SharedSession, get_local_db, is_shared_configured
-from ..models import Deadline, DeadlineStatus, Notification, NotificationStatus
+from ..models import Notification, NotificationStatus, Reminder, ReminderStatus
 from ..schemas import NotificationCounts, NotificationRead
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ def list_notifications(
     db: Session = Depends(get_local_db),
     only_unread: bool = False,
     include_pending: bool = False,
-    deadline_id: int | None = None,
+    reminder_id: int | None = None,
     limit: int = Query(50, ge=1, le=200),
 ) -> list[Notification]:
     conditions = []
@@ -29,8 +29,8 @@ def list_notifications(
         conditions.append(Notification.status != NotificationStatus.PENDING)
     if only_unread:
         conditions.append(Notification.read_at.is_(None))
-    if deadline_id is not None:
-        conditions.append(Notification.deadline_id == deadline_id)
+    if reminder_id is not None:
+        conditions.append(Notification.reminder_id == reminder_id)
 
     return list(
         db.scalars(
@@ -51,12 +51,12 @@ def counts(db: Session = Depends(get_local_db)) -> NotificationCounts:
     )
 
 
-def _open_deadline_ids(deadline_ids: set[int]) -> set[int] | None:
-    """Quali di queste scadenze risultano ancora aperte sul database condiviso.
+def _open_reminder_ids(reminder_ids: set[int]) -> set[int] | None:
+    """Quali di questi promemoria risultano ancora aperti sul database condiviso.
 
     Ritorna `None` quando la domanda non è rispondibile — postazione non ancora
     configurata, Neon in fase di risveglio, rete assente: casi in cui *non
-    sappiamo*, che vanno tenuti distinti da "la scadenza non è più aperta".
+    sappiamo*, che vanno tenuti distinti da "il promemoria non è più aperto".
     """
     if not is_shared_configured():
         return None
@@ -65,9 +65,9 @@ def _open_deadline_ids(deadline_ids: set[int]) -> set[int] | None:
     try:
         return set(
             shared_db.scalars(
-                select(Deadline.id).where(
-                    Deadline.id.in_(deadline_ids),
-                    Deadline.status == DeadlineStatus.OPEN,
+                select(Reminder.id).where(
+                    Reminder.id.in_(reminder_ids),
+                    Reminder.status == ReminderStatus.OPEN,
                 )
             ).all()
         )
@@ -88,8 +88,8 @@ def to_display(
     Interrogato dal processo principale di Electron, che mostra la notifica
     nativa di Windows e poi chiama `/displayed`.
 
-    Prima di restituirli si ricontrolla lo stato reale delle scadenze: fra la
-    consegna e il toast un collega può aver evaso o eliminato la scadenza da
+    Prima di restituirli si ricontrolla lo stato reale dei promemoria: fra la
+    consegna e il toast un collega può aver evaso o eliminato il promemoria da
     un'altra postazione, e mostrare un avviso per qualcosa di già fatto è
     peggio che non mostrarlo affatto.
 
@@ -113,14 +113,14 @@ def to_display(
     if not candidates:
         return []
 
-    still_open = _open_deadline_ids({n.deadline_id for n in candidates})
+    still_open = _open_reminder_ids({n.reminder_id for n in candidates})
     if still_open is None:
         return candidates
 
     now = datetime.now(timezone.utc)
     fresh: list[Notification] = []
     for notification in candidates:
-        if notification.deadline_id in still_open:
+        if notification.reminder_id in still_open:
             fresh.append(notification)
         else:
             # Obsoleto: niente toast, e fuori anche dai non letti.

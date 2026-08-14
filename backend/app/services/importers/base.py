@@ -11,7 +11,7 @@ class SourceTable:
 
 
 class SourceAdapter(ABC):
-    """Fonte da cui leggere le scadenze.
+    """Fonte da cui leggere i promemoria.
 
     Oggi implementata da CSV/Excel. Quando il cliente indicherà il gestionale,
     basterà aggiungere un adapter (REST, database, cartella condivisa) che

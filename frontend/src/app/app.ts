@@ -40,7 +40,7 @@ export class App implements OnInit {
     void this.push.init();
 
     // Click su una notifica nativa di Windows (applicazione desktop Electron).
-    const desktop = (window as unknown as { scadenzario?: DesktopBridge }).scadenzario;
+    const desktop = (window as unknown as { promemoria?: DesktopBridge }).promemoria;
     if (desktop?.onNavigate) {
       desktop.onNavigate((route) => void this.router.navigateByUrl(route));
     }

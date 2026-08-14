@@ -7,7 +7,7 @@ from dateutil import parser as date_parser
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ...models import Category, Deadline
+from ...models import Reminder
 from ...schemas import ImportMapping, ImportPreview, ImportPreviewRow, ImportResult
 from .. import alerts, settings_service
 from .base import SourceTable
@@ -20,7 +20,6 @@ FIELD_HINTS: dict[str, tuple[str, ...]] = {
     "amount": ("importo", "totale", "valore", "amount", "imponibile"),
     "owner": ("cliente", "fornitore", "intestatario", "referente", "responsabile", "owner", "assegnatario"),
     "reference": ("riferimento", "numero", "protocollo", "documento n", "reference", "n. doc", "fattura"),
-    "category": ("categoria", "tipo", "tipologia", "category", "gruppo"),
     "external_id": ("id", "codice", "id esterno", "external_id", "chiave", "key"),
 }
 
@@ -28,7 +27,7 @@ _AMOUNT_CLEAN = re.compile(r"[^\d,.\-]")
 
 
 def suggest_mapping(columns: list[str]) -> dict[str, str]:
-    """Associa i campi della scadenza alle colonne del file, per nome."""
+    """Associa i campi del promemoria alle colonne del file, per nome."""
     normalized = {c: c.strip().lower() for c in columns}
     mapping: dict[str, str] = {}
     used: set[str] = set()
@@ -107,7 +106,6 @@ def _row_values(row: dict[str, str], mapping: ImportMapping) -> tuple[dict, list
             "amount": parse_amount(get(mapping.amount)),
             "owner": get(mapping.owner) or None,
             "reference": get(mapping.reference) or None,
-            "category": get(mapping.category) or None,
             "external_id": get(mapping.external_id) or None,
         },
         errors,
@@ -139,32 +137,18 @@ def preview(table: SourceTable, mapping: ImportMapping | None = None, limit: int
     )
 
 
-def _get_or_create_category(db: Session, name: str, cache: dict[str, Category]) -> Category:
-    key = name.strip().lower()
-    if key in cache:
-        return cache[key]
-    category = db.scalar(select(Category).where(Category.name == name.strip()))
-    if category is None:
-        category = Category(name=name.strip())
-        db.add(category)
-        db.flush()
-    cache[key] = category
-    return category
-
-
 def apply_import(
     db: Session, local_db: Session, table: SourceTable, mapping: ImportMapping
 ) -> ImportResult:
-    """Crea/aggiorna le scadenze a partire dalla tabella sorgente.
+    """Crea/aggiorna i promemoria a partire dalla tabella sorgente.
 
     L'upsert usa (source, external_id) quando la colonna id è mappata,
     altrimenti (titolo, data) per evitare duplicati su import ripetuti.
     """
     app_settings = settings_service.get_settings(db)
-    cache: dict[str, Category] = {}
     created = updated = skipped = 0
     errors: list[str] = []
-    touched: list[Deadline] = []
+    touched: list[Reminder] = []
 
     for idx, raw in enumerate(table.rows, start=2):
         data, row_errors = _row_values(raw, mapping)
@@ -174,51 +158,46 @@ def apply_import(
                 errors.append(f"riga {idx}: {'; '.join(row_errors)}")
             continue
 
-        category = _get_or_create_category(db, data["category"], cache) if data["category"] else None
-
-        existing: Deadline | None = None
+        existing: Reminder | None = None
         if data["external_id"]:
             existing = db.scalar(
-                select(Deadline).where(
-                    Deadline.source == mapping.source,
-                    Deadline.external_id == data["external_id"],
+                select(Reminder).where(
+                    Reminder.source == mapping.source,
+                    Reminder.external_id == data["external_id"],
                 )
             )
         else:
             existing = db.scalar(
-                select(Deadline).where(
-                    Deadline.title == data["title"],
-                    Deadline.due_date == data["due_date"],
+                select(Reminder).where(
+                    Reminder.title == data["title"],
+                    Reminder.due_date == data["due_date"],
                 )
             )
 
         if existing is None:
-            deadline = Deadline(
+            reminder = Reminder(
                 title=data["title"],
                 description=data["description"],
                 due_date=data["due_date"],
+                kind=mapping.kind,
                 amount=data["amount"],
                 owner=data["owner"],
                 reference=data["reference"],
-                category_id=category.id if category else None,
                 alert_offsets=mapping.default_alert_offsets,
                 source=mapping.source,
                 external_id=data["external_id"],
                 extra={"import_row": idx},
             )
-            db.add(deadline)
+            db.add(reminder)
             db.flush()
             created += 1
-            touched.append(deadline)
+            touched.append(reminder)
         else:
             changed = False
             for field in ("title", "description", "due_date", "amount", "owner", "reference"):
                 if getattr(existing, field) != data[field] and data[field] is not None:
                     setattr(existing, field, data[field])
                     changed = True
-            if category is not None and existing.category_id != category.id:
-                existing.category_id = category.id
-                changed = True
             if changed:
                 updated += 1
                 touched.append(existing)
@@ -226,8 +205,8 @@ def apply_import(
                 skipped += 1
 
     db.commit()
-    for deadline in touched:
-        alerts.sync_deadline_notifications(local_db, deadline, app_settings, commit=False)
+    for reminder in touched:
+        alerts.sync_reminder_notifications(local_db, reminder, app_settings, commit=False)
     local_db.commit()
 
     return ImportResult(created=created, updated=updated, skipped=skipped, errors=errors)

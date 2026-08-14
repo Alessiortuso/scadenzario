@@ -39,8 +39,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    description="Gestione scadenze con avvisi e notifiche desktop.",
-    version="1.0.5",
+    description="Scadenze, appuntamenti e note con avvisi e notifiche desktop.",
+    version="1.1.0",
     lifespan=lifespan,
 )
 
@@ -81,7 +81,7 @@ def health() -> dict:
 class SpaStaticFiles(StaticFiles):
     """File statici con fallback su `index.html`.
 
-    Le rotte dell'interfaccia (`/scadenze/12`, `/impostazioni`, ...) esistono
+    Le rotte dell'interfaccia (`/promemoria/12`, `/calendario`, ...) esistono
     solo lato browser: senza questo fallback un accesso diretto o un
     ricaricamento della pagina risponderebbe 404.
     """

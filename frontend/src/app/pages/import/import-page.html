@@ -1,9 +1,9 @@
 <header class="page-head">
   <div>
-    <h1>Importazione scadenze</h1>
+    <h1>Importazione</h1>
     <p class="muted">
       Carica un file CSV o Excel: le colonne vengono riconosciute automaticamente e puoi correggere la mappatura
-      prima di importare. Reimportando lo stesso file le scadenze vengono aggiornate, non duplicate.
+      prima di importare. Reimportando lo stesso file i promemoria vengono aggiornati, non duplicati.
     </p>
   </div>
 </header>
@@ -13,6 +13,14 @@
     <div class="field grow">
       <label for="file">File (.csv, .xlsx)</label>
       <input id="file" type="file" accept=".csv,.txt,.xlsx,.xlsm" (change)="onFileSelected($event)" />
+    </div>
+    <div class="field">
+      <label for="kind">Tipo</label>
+      <select id="kind" [(ngModel)]="kind">
+        <option value="deadline">Scadenze</option>
+        <option value="appointment">Appuntamenti</option>
+        <option value="other">Altro</option>
+      </select>
     </div>
     <div class="field">
       <label for="source">Etichetta fonte</label>
@@ -62,7 +70,7 @@
         Importa {{ p.total_rows }} righe
       </button>
       @if (!canApply) {
-        <span class="small error-text">Titolo e data di scadenza sono obbligatori.</span>
+        <span class="small error-text">Titolo e data sono obbligatori.</span>
       }
     </div>
   </div>
@@ -79,7 +87,6 @@
               <th>Data</th>
               <th>Importo</th>
               <th>Cliente</th>
-              <th>Categoria</th>
               <th>Esito</th>
             } @else {
               @for (col of p.columns; track col) {
@@ -97,7 +104,6 @@
                 <td class="nowrap">{{ previewValue(row.data, 'due_date') }}</td>
                 <td class="right">{{ previewValue(row.data, 'amount') }}</td>
                 <td>{{ previewValue(row.data, 'owner') }}</td>
-                <td>{{ previewValue(row.data, 'category') }}</td>
                 <td>
                   @if (row.errors.length) {
                     <span class="badge badge-danger">{{ row.errors.join('; ') }}</span>

@@ -58,46 +58,48 @@
   gap: 1rem;
 }
 
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  margin-left: 0.5rem;
-  padding: 0.05rem 0.45rem;
-  border-radius: 999px;
-  background: var(--surface-2);
+/* L'icona sta al titolo come un'etichetta: smorzata, non in concorrenza. */
+.kind {
+  margin-right: 0.4rem;
   color: var(--text-muted);
-  font-size: 0.75rem;
 }
 
-.bars {
+.time {
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.kinds {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 0.7rem;
+  gap: 0.15rem;
 }
-.bar-label {
+.kinds a {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  font-size: 0.88rem;
-  margin-bottom: 0.25rem;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 8px;
+  color: inherit;
+  font-size: 0.9rem;
 }
-.bar-label .muted {
-  margin-left: auto;
-}
-.bar {
-  display: block;
-  height: 7px;
-  border-radius: 999px;
+.kinds a:hover {
   background: var(--surface-2);
-  overflow: hidden;
+  text-decoration: none;
 }
-.fill {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
+.kinds app-kind-icon {
+  color: var(--text-muted);
+}
+.kinds strong {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
 }
 
 .totals .row {

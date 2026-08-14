@@ -8,16 +8,16 @@ from sqlalchemy.orm import Session
 
 from ... import runtime_config
 from ...config import settings as env_settings
-from ...models import Deadline, Notification
+from ...models import Notification, Reminder, ReminderKind
 from ...schemas import AppSettings
 from .base import ChannelResult, Notifier
 
 logger = logging.getLogger(__name__)
 
 
-def _recipients(deadline: Deadline | None, app_settings: AppSettings) -> list[str]:
-    if deadline is not None and deadline.notify_emails:
-        return list(deadline.notify_emails)
+def _recipients(reminder: Reminder | None, app_settings: AppSettings) -> list[str]:
+    if reminder is not None and reminder.notify_emails:
+        return list(reminder.notify_emails)
     return [str(e) for e in app_settings.notify_emails]
 
 
@@ -53,21 +53,25 @@ class EmailNotifier(Notifier):
         self,
         db: Session,
         notification: Notification,
-        deadline: Deadline | None,
+        reminder: Reminder | None,
         app_settings: AppSettings,
     ) -> ChannelResult:
-        to = _recipients(deadline, app_settings)
+        to = _recipients(reminder, app_settings)
         if not to:
             return ChannelResult(ok=False, detail="nessun destinatario configurato")
 
         lines = [notification.body, ""]
-        if deadline is not None:
-            lines.append(f"Scadenza: {deadline.due_date.strftime('%d/%m/%Y')}")
-            if deadline.description:
-                lines.append(f"Note: {deadline.description}")
-            if deadline.reference:
-                lines.append(f"Riferimento: {deadline.reference}")
-        lines += ["", "-- Scadenzario"]
+        if reminder is not None:
+            etichetta = "Appuntamento" if reminder.kind == ReminderKind.APPOINTMENT else "Scadenza"
+            quando = reminder.due_date.strftime("%d/%m/%Y")
+            if reminder.start_time is not None:
+                quando += f" alle {reminder.start_time.strftime('%H:%M')}"
+            lines.append(f"{etichetta}: {quando}")
+            if reminder.description:
+                lines.append(f"Note: {reminder.description}")
+            if reminder.reference:
+                lines.append(f"Riferimento: {reminder.reference}")
+        lines += ["", "-- Promemoria"]
 
         try:
             send_mail(to, notification.title, "\n".join(lines))

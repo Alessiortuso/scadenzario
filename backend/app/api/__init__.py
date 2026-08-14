@@ -1,11 +1,10 @@
 from fastapi import APIRouter
 
-from . import categories, deadlines, imports, notifications, push, settings, setup
+from . import imports, notifications, push, reminders, settings, setup
 
 api_router = APIRouter()
 api_router.include_router(setup.router)
-api_router.include_router(deadlines.router)
-api_router.include_router(categories.router)
+api_router.include_router(reminders.router)
 api_router.include_router(notifications.router)
 api_router.include_router(push.router)
 api_router.include_router(imports.router)

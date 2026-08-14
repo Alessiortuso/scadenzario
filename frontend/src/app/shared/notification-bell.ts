@@ -38,7 +38,7 @@ export class NotificationBell {
       await this.store.markRead(notification.id);
     }
     this.open.set(false);
-    void this.router.navigate(['/scadenze', notification.deadline_id]);
+    void this.router.navigate(['/promemoria', notification.reminder_id]);
   }
 
   severityTone(severity: string): string {

@@ -1,20 +1,20 @@
 <header class="page-head">
   <div>
-    <a class="small" routerLink="/scadenze">← Torna all'elenco</a>
-    <h1>{{ isEdit() ? 'Modifica scadenza' : 'Nuova scadenza' }}</h1>
-    @if (current(); as d) {
+    <a class="small" routerLink="/promemoria">← Torna all'elenco</a>
+    <h1>{{ isEdit() ? 'Modifica promemoria' : 'Nuovo promemoria' }}</h1>
+    @if (current(); as r) {
       <p class="muted small">
-        Stato: <strong>{{ d.status === 'open' ? 'aperta' : d.status === 'done' ? 'evasa' : 'annullata' }}</strong>
-        · fonte: {{ d.source }}
-        @if (d.external_id) { · id esterno: {{ d.external_id }} }
+        Stato: <strong>{{ r.status === 'open' ? 'aperto' : r.status === 'done' ? 'completato' : 'annullato' }}</strong>
+        · fonte: {{ r.source }}
+        @if (r.external_id) { · id esterno: {{ r.external_id }} }
       </p>
     }
   </div>
 
-  @if (current(); as d) {
+  @if (current(); as r) {
     <div class="head-actions">
-      @if (d.status === 'open') {
-        <button class="btn" type="button" (click)="complete()">Segna evasa</button>
+      @if (r.status === 'open') {
+        <button class="btn" type="button" (click)="complete()">Segna completato</button>
       } @else {
         <button class="btn" type="button" (click)="reopen()">Riapri</button>
       }
@@ -34,30 +34,36 @@
         }
       </div>
 
+      <div class="field span-2">
+        <label>Tipo</label>
+        <div class="kind-choice">
+          <label class="kind-option">
+            <input type="radio" formControlName="kind" value="deadline" />
+            <span><app-kind-icon kind="deadline" /> Scadenza</span>
+          </label>
+          <label class="kind-option">
+            <input type="radio" formControlName="kind" value="appointment" />
+            <span><app-kind-icon kind="appointment" /> Appuntamento</span>
+          </label>
+          <label class="kind-option">
+            <input type="radio" formControlName="kind" value="other" />
+            <span><app-kind-icon kind="other" /> Altro</span>
+          </label>
+        </div>
+      </div>
+
       <div class="field">
-        <label for="due_date">Data di scadenza *</label>
+        <label for="due_date">{{ dateLabel() }}</label>
         <input id="due_date" type="date" formControlName="due_date" />
       </div>
 
-      <div class="field">
-        <label for="category_id">Categoria</label>
-        <select id="category_id" formControlName="category_id">
-          <option [ngValue]="null">Nessuna</option>
-          @for (c of categories(); track c.id) {
-            <option [ngValue]="c.id">{{ c.name }}</option>
-          }
-        </select>
-      </div>
-
-      <div class="field">
-        <label for="priority">Priorità</label>
-        <select id="priority" formControlName="priority">
-          <option value="low">Bassa</option>
-          <option value="normal">Normale</option>
-          <option value="high">Alta</option>
-          <option value="critical">Critica</option>
-        </select>
-      </div>
+      @if (showTime()) {
+        <div class="field">
+          <label for="start_time">Orario</label>
+          <input id="start_time" type="time" formControlName="start_time" />
+          <span class="small muted">Facoltativo: senza orario vale per tutta la giornata.</span>
+        </div>
+      }
 
       <div class="field">
         <label for="recurrence">Ricorrenza</label>
@@ -76,7 +82,7 @@
         <input id="amount" type="number" step="0.01" formControlName="amount" />
       </div>
 
-      <div class="field">
+      <div class="field span-2">
         <label for="owner">Cliente / responsabile</label>
         <input id="owner" formControlName="owner" />
       </div>
@@ -94,7 +100,7 @@
       <div class="field span-2">
         <label for="alert_offsets">Preavvisi personalizzati (giorni prima)</label>
         <input id="alert_offsets" formControlName="alert_offsets" placeholder="Es. 30, 15, 7, 1, 0" />
-        <span class="small muted">Lascia vuoto per usare quelli della categoria o quelli generali.</span>
+        <span class="small muted">Lascia vuoto per usare quelli generali delle impostazioni.</span>
       </div>
 
       <div class="field span-2">
@@ -106,9 +112,9 @@
 
     <div class="form-actions">
       <button class="btn btn-primary" type="submit" [disabled]="saving()">
-        {{ saving() ? 'Salvataggio…' : isEdit() ? 'Salva modifiche' : 'Crea scadenza' }}
+        {{ saving() ? 'Salvataggio…' : isEdit() ? 'Salva modifiche' : 'Crea promemoria' }}
       </button>
-      <a class="btn" routerLink="/scadenze">Annulla</a>
+      <a class="btn" routerLink="/promemoria">Annulla</a>
     </div>
   </form>
 

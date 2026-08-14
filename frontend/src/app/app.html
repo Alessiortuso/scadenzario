@@ -1,16 +1,17 @@
 <div class="shell" [class.menu-open]="menuOpen()" [class.bare]="bare()">
   <aside class="sidebar">
     <div class="brand">
-      <span class="mark">S</span>
+      <span class="mark">P</span>
       <span>
-        <strong>Scadenzario</strong>
-        <span class="small muted block">avvisi e notifiche</span>
+        <strong>Promemoria</strong>
+        <span class="small muted block">scadenze e appuntamenti</span>
       </span>
     </div>
 
     <nav (click)="menuOpen.set(false)">
       <a routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
-      <a routerLink="/scadenze" routerLinkActive="active">Scadenze</a>
+      <a routerLink="/calendario" routerLinkActive="active">Calendario</a>
+      <a routerLink="/promemoria" routerLinkActive="active">Promemoria</a>
       <a routerLink="/import" routerLinkActive="active">Importazione</a>
       <a routerLink="/impostazioni" routerLinkActive="active">Impostazioni</a>
     </nav>
@@ -45,7 +46,7 @@
     <header class="topbar">
       <button class="btn btn-ghost menu-toggle" type="button" (click)="menuOpen.set(!menuOpen())" aria-label="Menu">☰</button>
       <div class="spacer"></div>
-      <a class="btn btn-primary btn-sm" routerLink="/scadenze/nuova">+ Nuova scadenza</a>
+      <a class="btn btn-primary btn-sm" routerLink="/promemoria/nuovo">+ Nuovo promemoria</a>
       <app-notification-bell />
     </header>
 

@@ -1,6 +1,6 @@
-# Scadenzario
+# Promemoria
 
-Gestione scadenze con avvisi automatici e **notifiche desktop**, distribuita come
+Scadenze, appuntamenti e note con avvisi automatici e **notifiche desktop**, distribuiti come
 **applicazione Windows** installata sulle postazioni, senza server da tenere acceso.
 
 - **backend** — FastAPI + SQLAlchemy, scheduler integrato; gira come processo locale dentro l'app
@@ -12,7 +12,7 @@ Gestione scadenze con avvisi automatici e **notifiche desktop**, distribuita com
 ```
    PC 1                     PC 2                     PC 3
 ┌──────────────┐        ┌──────────────┐        ┌──────────────┐
-│ Scadenzario  │        │ Scadenzario  │        │ Scadenzario  │
+│ Promemoria   │        │ Promemoria   │        │ Promemoria   │
 │ (Electron +  │        │ (Electron +  │        │ (Electron +  │
 │  backend)    │        │  backend)    │        │  backend)    │
 │              │        │              │        │              │
@@ -21,26 +21,28 @@ Gestione scadenze con avvisi automatici e **notifiche desktop**, distribuita com
        └───────────────────────┬┴───────────────────────┘
                                │
                   PostgreSQL gestito (cloud, piano gratuito)
-                  scadenze · categorie · impostazioni
+                  promemoria · impostazioni
 ```
 
 Due database con due ruoli distinti:
 
-- **condiviso** (PostgreSQL): le scadenze, uguali per tutti — chi ne aggiunge una la fa vedere agli altri;
+- **condiviso** (PostgreSQL): i promemoria, uguali per tutti — chi ne aggiunge uno lo fa vedere agli altri;
 - **locale** (SQLite su ogni PC): quali avvisi *questa* postazione ha già mostrato, così ognuno riceve le proprie notifiche senza pestarsi i piedi con gli altri.
 
 **Conseguenza da conoscere**: non essendoci una macchina sempre accesa, se tutti i PC sono spenti nessun avviso parte in quel momento. Gli avvisi arretrati non si perdono: vengono mostrati all'accensione successiva.
 
 ## Cosa fa
 
-- Anagrafica scadenze: titolo, data, categoria, priorità, importo, cliente/responsabile, riferimento, note
-- **Preavvisi configurabili** (es. 30, 15, 7, 3, 1, 0 giorni prima) a livello globale, per categoria o per singola scadenza
-- **Solleciti dopo la scadenza** ogni N giorni, con tetto massimo
-- **Avviso di recupero**: una scadenza inserita quando è già scaduta (o già dentro la finestra di preavviso) genera comunque un avviso immediato
-- **Ricorrenze**: mensile, trimestrale, semestrale, annuale — chiudendo una scadenza viene creata automaticamente l'occorrenza successiva
+- **Tre tipi di promemoria**: scadenza, appuntamento e «altro». Cambia il modo di leggerli — una scadenza «scade», un appuntamento no — e il testo degli avvisi segue di conseguenza
+- Anagrafica essenziale: titolo, data, **orario facoltativo** (solo appuntamenti e «altro»), importo, cliente/responsabile, riferimento, note
+- **Vista calendario mensile** in stile agenda: griglia lunedì → domenica, promemoria dentro ai giorni ordinati per ora e colorati per tipo, filtro per tipo, pannello del giorno e inserimento con la data già compilata
+- **Preavvisi configurabili** (es. 30, 15, 7, 3, 1, 0 giorni prima) a livello globale o per singolo promemoria
+- **Solleciti dopo la data** ogni N giorni, con tetto massimo
+- **Avviso di recupero**: un promemoria inserito quando è già passato (o già dentro la finestra di preavviso) genera comunque un avviso immediato
+- **Ricorrenze**: mensile, trimestrale, semestrale, annuale — completandone uno viene creata automaticamente l'occorrenza successiva
 - **Canali di notifica** attivabili singolarmente: centro notifiche in-app, Web Push (desktop), email SMTP
 - **Importazione CSV/Excel** con riconoscimento automatico delle colonne, anteprima con validazione riga per riga e reimport idempotente (aggiorna, non duplica)
-- Dashboard con scadute / oggi / 7 / 30 giorni, ripartizione per categoria e totale importi aperti
+- Dashboard con scaduti / oggi / 7 / 30 giorni, ripartizione per tipo, totale importi aperti
 
 ## Notifiche desktop: cosa aspettarsi
 
@@ -51,13 +53,13 @@ Due database con due ruoli distinti:
 | Applicazione chiusa del tutto | No in quel momento; gli avvisi arretrati compaiono al riavvio |
 | PC spento | Come sopra: si recuperano all'accensione |
 
-Con l'app desktop le notifiche sono quelle native di Windows, quindi **non servono HTTPS, certificati o dominio**. Il canale Web Push resta nel codice e si attiva da solo se si vuole usare lo scadenzario da browser (vedi `VAPID_*`).
+Con l'app desktop le notifiche sono quelle native di Windows, quindi **non servono HTTPS, certificati o dominio**. Il canale Web Push resta nel codice e si attiva da solo se si vuole usare l'applicazione da browser (vedi `VAPID_*`).
 
 Il canale email è disponibile come rete di sicurezza: va acceso su **una sola** postazione (`EMAIL_SENDER_DEVICE=true`), altrimenti ogni PC acceso invia la sua copia.
 
 ## Configurazione al primo avvio
 
-**Le credenziali del database non sono dentro l'installer.** Alla prima apertura ogni postazione mostra una schermata dove si incolla la stringa di connessione, che viene verificata e salvata in `%LOCALAPPDATA%\Scadenzario\config.json` **su quel solo computer**.
+**Le credenziali del database non sono dentro l'installer.** Alla prima apertura ogni postazione mostra una schermata dove si incolla la stringa di connessione, che viene verificata e salvata in `%LOCALAPPDATA%\Promemoria\config.json` **su quel solo computer**.
 
 Perché è fatto così:
 
@@ -73,7 +75,7 @@ In sviluppo si può saltare la schermata valorizzando `DATABASE_URL` in `backend
 
 ## Database condiviso (Neon)
 
-Progetto Neon: **Scadenzario**, PostgreSQL 18, regione `eu-central-1` (Francoforte), piano gratuito.
+Progetto Neon: **Scadenzario** (nome storico, invariato), PostgreSQL 18, regione `eu-central-1` (Francoforte), piano gratuito.
 
 ```
 DATABASE_URL=postgresql+psycopg://<utente>:<password>@<host>.eu-central-1.aws.neon.tech/neondb?sslmode=require
@@ -86,7 +88,7 @@ Due avvertenze operative:
 - Il piano gratuito **va in standby dopo qualche minuto di inattività**: la prima richiesta della giornata impiega qualche secondo in più per risvegliare il database. Nessun impatto sul funzionamento.
 - La connection string contiene la password del database ed è replicata sul `.env` di ogni postazione: chi ha accesso a quei PC ha accesso ai dati. Per rigenerarla: dashboard Neon → *Reset password*, poi aggiornare i `.env`.
 
-Sul database condiviso vivono solo tre tabelle — `deadlines`, `categories`, `settings`. Le notifiche stanno nel database locale di ciascuna postazione.
+Sul database condiviso vivono solo due tabelle — `reminders` e `settings`. Le notifiche stanno nel database locale di ciascuna postazione.
 
 ## Evoluzione dello schema
 
@@ -95,6 +97,19 @@ Lo schema è gestito con **Alembic** e si aggiorna da sé: a ogni avvio il backe
 I due database hanno storie separate — tabelle di versione distinte, `alembic_version` e `alembic_version_local` — perché uno è condiviso da tutti e l'altro appartiene alla singola postazione.
 
 Le installazioni nate prima delle migrazioni (la 1.0.0, che creava le tabelle con `create_all`) non vengono ricreate: al primo avvio lo schema esistente viene *marcato* alla revisione iniziale, e da lì in poi segue le migrazioni normalmente.
+
+### Aggiornamento alla 1.1.0 — da Scadenzario a Promemoria
+
+La 1.1.0 rinomina le tabelle (`deadlines` → `reminders`, `notifications.deadline_id` → `reminder_id`) e aggiunge il tipo e l'orario. **I dati non si perdono**: la migrazione `0002` rinomina, non ricrea, e tutti i promemoria esistenti diventano di tipo «scadenza», che è quello che erano.
+
+La migrazione `0003` **elimina categoria e priorità**, per snellire una schermata di inserimento diventata troppo lunga. Qui invece qualcosa si perde, ed è voluto: la tabella `categories` viene cancellata insieme ai preavvisi che si portava dietro. I promemoria restano tutti; i preavvisi continuano a funzionare a due livelli (quelli scritti sul singolo promemoria, e in mancanza quelli generali delle impostazioni) invece dei tre di prima.
+
+Due conseguenze operative, entrambe volute:
+
+- **L'aggiornamento va fatto su tutte le postazioni.** Una postazione ferma alla 1.0.x non riconosce più lo schema del database condiviso e smette di funzionare finché non aggiorna. Gli aggiornamenti sono automatici, ma un PC rimasto spento a lungo va acceso e lasciato aggiornare prima dell'uso.
+- **La cartella dati cambia nome**, da `%LOCALAPPDATA%\Scadenzario` a `%LOCALAPPDATA%\Promemoria`. Lo spostamento è automatico e porta con sé `config.json` e il database locale degli avvisi, così non va rifatta la configurazione. Se la cartella risulta occupata si continua a usare la vecchia e si riprova al riavvio successivo.
+
+Restano invariati di proposito, perché cambiarli farebbe danni senza portare vantaggi: l'`appId` di electron-builder (`it.scadenzario.desktop`) — cambiarlo installerebbe la 1.1.0 **accanto** alla vecchia invece che al suo posto — il repository GitHub degli aggiornamenti e il nome del progetto Neon. Sono identificatori interni che nessun utente legge. Restano validi anche i collegamenti `scadenzario://` dei toast già mostrati, e le vecchie rotte `/scadenze/...` rimandano alle nuove.
 
 Per aggiungere una modifica dopo aver cambiato i modelli:
 
@@ -198,10 +213,10 @@ Il dev server inoltra `/api` al backend tramite `proxy.conf.json`.
 | Variabile | Effetto |
 |---|---|
 | `DATABASE_URL` | Database condiviso: `postgresql+psycopg://utente:pwd@host/db?sslmode=require` |
-| `LOCAL_DATABASE_URL` | Database locale della postazione (vuoto = `%LOCALAPPDATA%\Scadenzario\locale.db`) |
+| `LOCAL_DATABASE_URL` | Database locale della postazione (vuoto = `%LOCALAPPDATA%\Promemoria\locale.db`) |
 | `EMAIL_SENDER_DEVICE` | `true` su **una sola** postazione, per non moltiplicare le email |
 | `DEFAULT_ALERT_OFFSETS` | Preavvisi predefiniti in giorni |
-| `OVERDUE_REPEAT_DAYS` / `OVERDUE_MAX_REMINDERS` | Solleciti dopo la scadenza |
+| `OVERDUE_REPEAT_DAYS` / `OVERDUE_MAX_REMINDERS` | Solleciti dopo la data |
 | `DAILY_SEND_TIME` | Orario di invio degli avvisi del giorno |
 | `SCHEDULER_INTERVAL_SECONDS` | Frequenza del ciclo interno (default 300s) |
 | `VAPID_*` | Chiavi Web Push — senza queste il canale desktop resta disattivo |
@@ -213,7 +228,7 @@ Preavvisi, orari, canali e destinatari sono modificabili anche a runtime dalla p
 
 Ogni `SCHEDULER_INTERVAL_SECONDS` il backend:
 
-1. ricalcola gli avvisi pendenti di tutte le scadenze aperte (`alerts.sync_all`);
+1. ricalcola gli avvisi pendenti di tutti i promemoria aperti (`alerts.sync_all`);
 2. spedisce quelli la cui ora di invio è arrivata, su tutti i canali attivi (`dispatcher.dispatch_due`).
 
 Ogni avviso ha una `dedupe_key`, quindi non viene mai inviato due volte. Il ciclo è richiamabile anche manualmente con `POST /api/scheduler/run` (o dal pulsante "Esegui ciclo avvisi adesso"): utile se in produzione preferisci un cron esterno o più repliche del backend.
@@ -225,7 +240,7 @@ backend/
   alembic/          migrazioni dello schema (condiviso e locale)
   tests/            test del motore avvisi, delle ricorrenze e degli endpoint
   app/
-    api/            endpoint REST (scadenze, categorie, notifiche, push, import, impostazioni)
+    api/            endpoint REST (promemoria, notifiche, push, import, impostazioni)
     migrations.py   applicazione delle migrazioni all'avvio
     services/
       alerts.py     calcolo dei preavvisi e generazione notifiche
@@ -238,11 +253,11 @@ frontend/
   public/sw.js      service worker delle notifiche desktop
   src/app/
     core/           servizi API, store notifiche, push, toast
-    pages/          dashboard, scadenze, import, impostazioni
-    shared/         campanella notifiche, badge scadenza
+    pages/          dashboard, calendario, promemoria, import, impostazioni
+    shared/         campanella notifiche, badge scadenza, icone dei tipi
 ```
 
-## Quando il cliente indicherà dove sono registrate le scadenze
+## Quando il cliente indicherà dove sono registrati i dati di partenza
 
 Il sistema nasce con un database proprio e un livello di import isolato, quindi l'integrazione è additiva:
 
@@ -252,4 +267,4 @@ Il sistema nasce con un database proprio e un livello di import isolato, quindi 
 ## Non incluso (da decidere con il cliente)
 
 - **Autenticazione**: l'API è aperta, pensata per rete interna. Prima di esporla su Internet va aggiunto un livello di login (OAuth2/JWT o SSO aziendale) e la separazione per utente.
-- Allegati sulle scadenze, log di audit, export PDF/Excel.
+- Allegati sui promemoria, log di audit, export PDF/Excel, invito degli appuntamenti in Outlook/Google Calendar.

@@ -5,16 +5,17 @@ import { Observable } from 'rxjs';
 import {
   AppNotification,
   AppSettings,
-  Category,
-  Deadline,
-  DeadlinePage,
-  DeadlineQuery,
-  DeadlineStats,
+  CalendarMonth,
+  CalendarQuery,
   ImportMapping,
   ImportPreview,
   ImportResult,
   NotificationCounts,
   PushSubscriptionInfo,
+  Reminder,
+  ReminderPage,
+  ReminderQuery,
+  ReminderStats,
   SettingsRead,
   SetupPayload,
   SetupStatus,
@@ -40,66 +41,66 @@ export class ApiService {
     return this.http.post<SetupStatus>(`${BASE}/setup`, payload);
   }
 
-  // ------------------------------------------------------------- scadenze
-  listDeadlines(query: DeadlineQuery = {}): Observable<DeadlinePage> {
+  // ----------------------------------------------------------- promemoria
+  /** I campi valorizzati diventano parametri; vuoti, nulli e `false` si omettono. */
+  private toParams(query: object): HttpParams {
     let params = new HttpParams();
     for (const [key, value] of Object.entries(query)) {
       if (value !== null && value !== undefined && value !== '' && value !== false) {
         params = params.set(key, String(value));
       }
     }
-    return this.http.get<DeadlinePage>(`${BASE}/deadlines`, { params });
+    return params;
   }
 
-  getDeadline(id: number): Observable<Deadline> {
-    return this.http.get<Deadline>(`${BASE}/deadlines/${id}`);
+  listReminders(query: ReminderQuery = {}): Observable<ReminderPage> {
+    return this.http.get<ReminderPage>(`${BASE}/reminders`, { params: this.toParams(query) });
   }
 
-  upcoming(days = 30, limit = 50): Observable<Deadline[]> {
-    return this.http.get<Deadline[]>(`${BASE}/deadlines/upcoming`, {
+  getReminder(id: number): Observable<Reminder> {
+    return this.http.get<Reminder>(`${BASE}/reminders/${id}`);
+  }
+
+  /** Il mese pronto da disegnare: settimane intere, giorno per giorno. */
+  calendar(query: CalendarQuery): Observable<CalendarMonth> {
+    // `include_done` è l'unico flag che va mandato anche quando è false:
+    // ometterlo significherebbe "mostrali", cioè il contrario di quel che vuole
+    // chi ha tolto la spunta.
+    const params = this.toParams({ ...query, include_done: undefined }).set(
+      'include_done',
+      query.include_done ?? true,
+    );
+    return this.http.get<CalendarMonth>(`${BASE}/reminders/calendar`, { params });
+  }
+
+  upcoming(days = 30, limit = 50): Observable<Reminder[]> {
+    return this.http.get<Reminder[]>(`${BASE}/reminders/upcoming`, {
       params: new HttpParams().set('days', days).set('limit', limit),
     });
   }
 
-  stats(): Observable<DeadlineStats> {
-    return this.http.get<DeadlineStats>(`${BASE}/deadlines/stats`);
+  stats(): Observable<ReminderStats> {
+    return this.http.get<ReminderStats>(`${BASE}/reminders/stats`);
   }
 
-  createDeadline(payload: Partial<Deadline>): Observable<Deadline> {
-    return this.http.post<Deadline>(`${BASE}/deadlines`, payload);
+  createReminder(payload: Partial<Reminder>): Observable<Reminder> {
+    return this.http.post<Reminder>(`${BASE}/reminders`, payload);
   }
 
-  updateDeadline(id: number, payload: Partial<Deadline>): Observable<Deadline> {
-    return this.http.patch<Deadline>(`${BASE}/deadlines/${id}`, payload);
+  updateReminder(id: number, payload: Partial<Reminder>): Observable<Reminder> {
+    return this.http.patch<Reminder>(`${BASE}/reminders/${id}`, payload);
   }
 
-  completeDeadline(id: number): Observable<Deadline> {
-    return this.http.post<Deadline>(`${BASE}/deadlines/${id}/complete`, {});
+  completeReminder(id: number): Observable<Reminder> {
+    return this.http.post<Reminder>(`${BASE}/reminders/${id}/complete`, {});
   }
 
-  reopenDeadline(id: number): Observable<Deadline> {
-    return this.http.post<Deadline>(`${BASE}/deadlines/${id}/reopen`, {});
+  reopenReminder(id: number): Observable<Reminder> {
+    return this.http.post<Reminder>(`${BASE}/reminders/${id}/reopen`, {});
   }
 
-  deleteDeadline(id: number): Observable<void> {
-    return this.http.delete<void>(`${BASE}/deadlines/${id}`);
-  }
-
-  // ----------------------------------------------------------- categorie
-  listCategories(): Observable<Category[]> {
-    return this.http.get<Category[]>(`${BASE}/categories`);
-  }
-
-  createCategory(payload: Partial<Category>): Observable<Category> {
-    return this.http.post<Category>(`${BASE}/categories`, payload);
-  }
-
-  updateCategory(id: number, payload: Partial<Category>): Observable<Category> {
-    return this.http.patch<Category>(`${BASE}/categories/${id}`, payload);
-  }
-
-  deleteCategory(id: number): Observable<void> {
-    return this.http.delete<void>(`${BASE}/categories/${id}`);
+  deleteReminder(id: number): Observable<void> {
+    return this.http.delete<void>(`${BASE}/reminders/${id}`);
   }
 
   // ----------------------------------------------------------- notifiche
@@ -109,11 +110,11 @@ export class ApiService {
     });
   }
 
-  /** Storico + avvisi ancora programmati per una singola scadenza. */
-  deadlineNotifications(deadlineId: number): Observable<AppNotification[]> {
+  /** Storico + avvisi ancora programmati per un singolo promemoria. */
+  reminderNotifications(reminderId: number): Observable<AppNotification[]> {
     return this.http.get<AppNotification[]>(`${BASE}/notifications`, {
       params: new HttpParams()
-        .set('deadline_id', deadlineId)
+        .set('reminder_id', reminderId)
         .set('include_pending', true)
         .set('limit', 100),
     });

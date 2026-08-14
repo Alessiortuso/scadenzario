@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timezone
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from .models import DeadlineStatus, NotificationStatus, Priority, Recurrence
+from .models import NotificationStatus, Recurrence, ReminderKind, ReminderStatus
 
 
 class ORMModel(BaseModel):
@@ -24,38 +24,17 @@ def _as_utc(value: datetime | None) -> datetime | None:
     return value
 
 
-# --------------------------------------------------------------------------- categorie
-class CategoryBase(BaseModel):
-    name: str = Field(min_length=1, max_length=120)
-    color: str = "#6366f1"
-    alert_offsets: list[int] | None = None
-
-
-class CategoryCreate(CategoryBase):
-    pass
-
-
-class CategoryUpdate(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=120)
-    color: str | None = None
-    alert_offsets: list[int] | None = None
-
-
-class CategoryRead(ORMModel, CategoryBase):
-    id: int
-
-
-# --------------------------------------------------------------------------- scadenze
-class DeadlineBase(BaseModel):
+# ------------------------------------------------------------------ promemoria
+class ReminderBase(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     description: str | None = None
     due_date: date
-    priority: Priority = Priority.NORMAL
+    start_time: time | None = None
+    kind: ReminderKind = ReminderKind.DEADLINE
     recurrence: Recurrence = Recurrence.NONE
     amount: float | None = None
     owner: str | None = None
     reference: str | None = None
-    category_id: int | None = None
     alert_offsets: list[int] | None = None
     notify_emails: list[EmailStr] | None = None
 
@@ -66,39 +45,49 @@ class DeadlineBase(BaseModel):
             return None
         return sorted({int(x) for x in v if int(x) >= 0}, reverse=True)
 
+    @field_validator("start_time", mode="before")
+    @classmethod
+    def _empty_time_is_none(cls, v: object) -> object:
+        # Un <input type="time"> svuotato manda una stringa vuota, non null.
+        return None if v == "" else v
 
-class DeadlineCreate(DeadlineBase):
+
+class ReminderCreate(ReminderBase):
     source: str = "manual"
     external_id: str | None = None
     extra: dict | None = None
 
 
-class DeadlineUpdate(BaseModel):
+class ReminderUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = None
     due_date: date | None = None
-    status: DeadlineStatus | None = None
-    priority: Priority | None = None
+    start_time: time | None = None
+    kind: ReminderKind | None = None
+    status: ReminderStatus | None = None
     recurrence: Recurrence | None = None
     amount: float | None = None
     owner: str | None = None
     reference: str | None = None
-    category_id: int | None = None
     alert_offsets: list[int] | None = None
     notify_emails: list[EmailStr] | None = None
     extra: dict | None = None
 
+    @field_validator("start_time", mode="before")
+    @classmethod
+    def _empty_time_is_none(cls, v: object) -> object:
+        return None if v == "" else v
 
-class DeadlineRead(ORMModel, DeadlineBase):
+
+class ReminderRead(ORMModel, ReminderBase):
     id: int
-    status: DeadlineStatus
+    status: ReminderStatus
     source: str
     external_id: str | None
     extra: dict | None
     completed_at: datetime | None
     created_at: datetime
     updated_at: datetime
-    category: CategoryRead | None = None
     days_left: int
     is_overdue: bool
 
@@ -109,14 +98,14 @@ class DeadlineRead(ORMModel, DeadlineBase):
         return _as_utc(v)
 
 
-class DeadlinePage(BaseModel):
-    items: list[DeadlineRead]
+class ReminderPage(BaseModel):
+    items: list[ReminderRead]
     total: int
     page: int
     page_size: int
 
 
-class DeadlineStats(BaseModel):
+class ReminderStats(BaseModel):
     overdue: int
     due_today: int
     due_in_7_days: int
@@ -124,20 +113,41 @@ class DeadlineStats(BaseModel):
     open_total: int
     done_total: int
     amount_open: float
-    by_category: list["CategoryStat"]
+    by_kind: list["KindStat"]
 
 
-class CategoryStat(BaseModel):
-    category_id: int | None
-    name: str
-    color: str
+class KindStat(BaseModel):
+    kind: ReminderKind
     count: int
+
+
+# ----------------------------------------------------------------- calendario
+class CalendarDay(BaseModel):
+    """Un giorno della griglia mensile con i suoi promemoria.
+
+    `in_month` distingue i giorni del mese richiesto da quelli di riempimento
+    agli estremi della griglia (la coda di settembre in una vista di ottobre).
+    """
+
+    date: date
+    in_month: bool
+    items: list[ReminderRead]
+
+
+class CalendarMonth(BaseModel):
+    year: int
+    month: int
+    #: Estremi della griglia mostrata, non del mese: comodi al frontend per
+    #: sapere che cosa ha già in mano senza ricalcolarli.
+    grid_start: date
+    grid_end: date
+    days: list[CalendarDay]
 
 
 # --------------------------------------------------------------------------- notifiche
 class NotificationRead(ORMModel):
     id: int
-    deadline_id: int
+    reminder_id: int
     offset_days: int
     title: str
     body: str
@@ -200,15 +210,17 @@ class ImportPreview(BaseModel):
 
 
 class ImportMapping(BaseModel):
-    """Mappa campo-scadenza -> nome colonna del file."""
+    """Mappa campo-promemoria -> nome colonna del file."""
 
     title: str
     due_date: str
     description: str | None = None
+    #: Tipo assegnato a tutte le righe importate: i tracciati gestionali
+    #: portano scadenze, ma un'agenda esportata porta appuntamenti.
+    kind: ReminderKind = ReminderKind.DEADLINE
     amount: str | None = None
     owner: str | None = None
     reference: str | None = None
-    category: str | None = None
     external_id: str | None = None
     date_format: str | None = None
     source: str = "import"
@@ -241,4 +253,4 @@ class SettingsRead(AppSettings):
     timezone: str
 
 
-DeadlineStats.model_rebuild()
+ReminderStats.model_rebuild()

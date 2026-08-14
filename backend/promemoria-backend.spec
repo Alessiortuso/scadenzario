@@ -1,6 +1,6 @@
 # Pacchetto del backend, incluso nell'app desktop.
 #
-#   .venv\Scripts\python.exe -m PyInstaller scadenzario-backend.spec --noconfirm
+#   .venv\Scripts\python.exe -m PyInstaller promemoria-backend.spec --noconfirm
 #
 # Il frontend compilato viene incluso in `app/static`, così l'eseguibile serve
 # sia le API sia l'interfaccia.
@@ -50,7 +50,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="scadenzario-backend",
+    name="promemoria-backend",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -74,5 +74,5 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name="scadenzario-backend",
+    name="promemoria-backend",
 )

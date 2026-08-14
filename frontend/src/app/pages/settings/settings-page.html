@@ -1,7 +1,7 @@
 <header class="page-head">
   <div>
     <h1>Impostazioni</h1>
-    <p class="muted">Canali di notifica, preavvisi e categorie.</p>
+    <p class="muted">Canali di notifica e preavvisi.</p>
   </div>
   <div class="head-actions">
     <a class="btn btn-sm" routerLink="/configurazione">Collegamento al database</a>
@@ -59,7 +59,7 @@
       <div class="field">
         <label for="offsets">Preavvisi predefiniti (giorni prima)</label>
         <input id="offsets" [(ngModel)]="offsetsText" placeholder="30, 15, 7, 3, 1, 0" />
-        <span class="small muted">Usati quando la scadenza e la categoria non ne definiscono di propri.</span>
+        <span class="small muted">Usati quando il promemoria non ne definisce di propri.</span>
       </div>
 
       <div class="field">
@@ -69,7 +69,7 @@
       </div>
 
       <div class="field">
-        <label for="repeat">Sollecito dopo la scadenza (ogni N giorni)</label>
+        <label for="repeat">Sollecito dopo la data (ogni N giorni)</label>
         <input
           id="repeat"
           type="number"
@@ -177,66 +177,6 @@
     }
   </div>
 
-  <div class="card">
-    <h2>Categorie</h2>
-    <p class="small muted">Ogni categoria può avere i propri preavvisi, che prevalgono su quelli predefiniti.</p>
-
-    <div class="table-wrap">
-      <table class="data">
-        <thead>
-          <tr>
-            <th></th>
-            <th>Nome</th>
-            <th>Preavvisi</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (c of categories(); track c.id) {
-            <tr>
-              <td><span class="dot" [style.background]="c.color"></span></td>
-              <td>{{ c.name }}</td>
-              <td class="muted">{{ c.alert_offsets?.length ? c.alert_offsets?.join(', ') + ' giorni prima' : 'predefiniti' }}</td>
-              <td class="right">
-                <button class="btn btn-sm btn-danger" type="button" (click)="removeCategory(c)">Elimina</button>
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
-
-    <div class="toolbar new-category">
-      <div class="field grow">
-        <label for="cat-name">Nuova categoria</label>
-        <input
-          id="cat-name"
-          [value]="newCategory().name"
-          (input)="newCategory.set({ name: $any($event.target).value, color: newCategory().color, offsets: newCategory().offsets })"
-          placeholder="Es. Fiscale"
-        />
-      </div>
-      <div class="field">
-        <label for="cat-color">Colore</label>
-        <input
-          id="cat-color"
-          type="color"
-          [value]="newCategory().color"
-          (input)="newCategory.set({ name: newCategory().name, color: $any($event.target).value, offsets: newCategory().offsets })"
-        />
-      </div>
-      <div class="field">
-        <label for="cat-offsets">Preavvisi</label>
-        <input
-          id="cat-offsets"
-          [value]="newCategory().offsets"
-          (input)="newCategory.set({ name: newCategory().name, color: newCategory().color, offsets: $any($event.target).value })"
-          placeholder="60, 30, 7"
-        />
-      </div>
-      <button class="btn" type="button" (click)="addCategory()">Aggiungi</button>
-    </div>
-  </div>
 } @else {
   <p class="empty">Caricamento…</p>
 }

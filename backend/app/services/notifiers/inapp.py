@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from ...models import Deadline, Notification
+from ...models import Notification, Reminder
 from ...schemas import AppSettings
 from .base import ChannelResult, Notifier
 
@@ -20,7 +20,7 @@ class InAppNotifier(Notifier):
         self,
         db: Session,
         notification: Notification,
-        deadline: Deadline | None,
+        reminder: Reminder | None,
         app_settings: AppSettings,
     ) -> ChannelResult:
         return ChannelResult(ok=True, detail="disponibile nel centro notifiche")

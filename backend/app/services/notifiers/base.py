@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
-from ...models import Deadline, Notification
+from ...models import Notification, Reminder
 from ...schemas import AppSettings
 
 
@@ -21,8 +21,8 @@ class Notifier(ABC):
     Aggiungere un canale (Telegram, SMS, ...) significa solo implementare questa
     interfaccia e registrarla nel dispatcher.
 
-    `db` è la sessione sul database locale; `deadline` è la scadenza letta dal
-    database condiviso e può essere `None` se nel frattempo è stata rimossa.
+    `db` è la sessione sul database locale; `reminder` è il promemoria letto dal
+    database condiviso e può essere `None` se nel frattempo è stato rimosso.
     """
 
     name: str = "base"
@@ -35,6 +35,6 @@ class Notifier(ABC):
         self,
         db: Session,
         notification: Notification,
-        deadline: Deadline | None,
+        reminder: Reminder | None,
         app_settings: AppSettings,
     ) -> ChannelResult: ...

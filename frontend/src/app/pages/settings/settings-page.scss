@@ -60,19 +60,6 @@
   color: var(--text-muted);
 }
 
-.new-category {
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border);
-}
-.new-category .grow {
-  flex: 1 1 220px;
-}
-.new-category input[type='color'] {
-  padding: 0.15rem;
-  height: 38px;
-}
-
 @media (max-width: 800px) {
   .grid-2 {
     grid-template-columns: 1fr;

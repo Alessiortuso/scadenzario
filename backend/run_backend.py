@@ -4,7 +4,7 @@ Nel pacchetto distribuito non esiste `uvicorn` da riga di comando: è questo
 eseguibile a farlo partire. Viene avviato dall'applicazione Electron, che gli
 passa la porta.
 
-    scadenzario-backend.exe --port 8010
+    promemoria-backend.exe --port 8010
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from pathlib import Path
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Backend dello Scadenzario")
+    parser = argparse.ArgumentParser(description="Backend di Promemoria")
     parser.add_argument("--port", type=int, default=8010)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--log-level", default="info")
@@ -26,7 +26,7 @@ def main() -> None:
     # accanto al database locale, per poter diagnosticare i problemi.
     from app.config import settings
 
-    log_file = Path(settings.data_dir) / "scadenzario.log"
+    log_file = Path(settings.data_dir) / "promemoria.log"
     handlers: list[logging.Handler] = [logging.FileHandler(log_file, encoding="utf-8")]
     # In un eseguibile senza console i flussi standard possono non esistere.
     if sys.stdout is not None:

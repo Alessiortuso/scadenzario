@@ -5,7 +5,8 @@ import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { ApiService } from '../../core/api.service';
-import { Category, PushSubscriptionInfo, SettingsRead } from '../../core/models';
+import { describeError } from '../../core/describe-error';
+import { PushSubscriptionInfo, SettingsRead } from '../../core/models';
 import { NotificationStore } from '../../core/notification.store';
 import { PushService } from '../../core/push.service';
 import { ToastService } from '../../core/toast.service';
@@ -28,24 +29,20 @@ export class SettingsPage implements OnInit {
   readonly saving = signal(false);
 
   readonly devices = signal<PushSubscriptionInfo[]>([]);
-  readonly categories = signal<Category[]>([]);
-  readonly newCategory = signal({ name: '', color: '#6366f1', offsets: '' });
 
   async ngOnInit(): Promise<void> {
     await this.reload();
   }
 
   async reload(): Promise<void> {
-    const [settings, devices, categories] = await Promise.all([
+    const [settings, devices] = await Promise.all([
       firstValueFrom(this.api.getSettings()),
       firstValueFrom(this.api.pushSubscriptions()),
-      firstValueFrom(this.api.listCategories()),
     ]);
     this.settings.set(settings);
     this.offsetsText.set(settings.default_alert_offsets.join(', '));
     this.emailsText.set(settings.notify_emails.join(', '));
     this.devices.set(devices);
-    this.categories.set(categories);
   }
 
   patch<K extends keyof SettingsRead>(key: K, value: SettingsRead[K]): void {
@@ -87,7 +84,7 @@ export class SettingsPage implements OnInit {
     try {
       this.toasts.success(await this.push.sendTest());
     } catch (err) {
-      this.toasts.error('Invio di prova non riuscito: ' + describe(err));
+      this.toasts.error('Invio di prova non riuscito: ' + describeError(err));
     }
   }
 
@@ -103,35 +100,6 @@ export class SettingsPage implements OnInit {
     this.toasts.success(
       `Ciclo eseguito: ${result.generated} avvisi ricalcolati, ${result.sent} inviati, ${result.failed} falliti`,
     );
-  }
-
-  async addCategory(): Promise<void> {
-    const value = this.newCategory();
-    if (!value.name.trim()) {
-      return;
-    }
-    try {
-      await firstValueFrom(
-        this.api.createCategory({
-          name: value.name.trim(),
-          color: value.color,
-          alert_offsets: parseNumbers(value.offsets).length ? parseNumbers(value.offsets) : null,
-        }),
-      );
-      this.newCategory.set({ name: '', color: '#6366f1', offsets: '' });
-      this.categories.set(await firstValueFrom(this.api.listCategories()));
-      this.toasts.success('Categoria creata');
-    } catch (err) {
-      this.toasts.error('Creazione non riuscita: ' + describe(err));
-    }
-  }
-
-  async removeCategory(category: Category): Promise<void> {
-    if (!confirm(`Eliminare la categoria «${category.name}»? Le scadenze resteranno senza categoria.`)) {
-      return;
-    }
-    await firstValueFrom(this.api.deleteCategory(category.id));
-    this.categories.set(await firstValueFrom(this.api.listCategories()));
   }
 
   pushLabel(): string {
@@ -166,9 +134,4 @@ function parseList(text: string): string[] {
     .split(/[,;\s]+/)
     .map((v) => v.trim())
     .filter(Boolean);
-}
-
-function describe(err: unknown): string {
-  const detail = (err as { error?: { detail?: unknown } })?.error?.detail;
-  return typeof detail === 'string' ? detail : 'errore imprevisto';
 }

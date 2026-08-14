@@ -1,6 +1,6 @@
 """Due database, due responsabilità.
 
-- **Condiviso** (PostgreSQL in cloud): scadenze, categorie e impostazioni. È la
+- **Condiviso** (PostgreSQL in cloud): promemoria e impostazioni. È la
   fonte di verità comune a tutte le postazioni. La sua connessione arriva dalla
   configurazione di primo avvio, quindi può non esserci ancora: in quel caso
   l'applicazione parte lo stesso e mostra la schermata di configurazione.

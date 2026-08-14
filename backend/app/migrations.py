@@ -36,6 +36,10 @@ logger = logging.getLogger(__name__)
 BASELINE = "0001"
 
 #: Tabella già presente prima di Alembic: se c'è, il database non è nuovo.
+#:
+#: Resta `deadlines` anche dopo la rinomina in `reminders` della 0002: la spia
+#: serve a riconoscere le installazioni 1.0.0, che quel nome ce l'hanno ancora.
+#: Un database già migrato ha la tabella delle versioni e non arriva qui.
 _WITNESS = {"shared": "deadlines", "local": "notifications"}
 
 _VERSION_TABLE = {"shared": "alembic_version", "local": "alembic_version_local"}

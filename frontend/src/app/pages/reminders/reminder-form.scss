@@ -29,6 +29,33 @@
   grid-column: span 2;
 }
 
+.kind-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.kind-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.9rem;
+}
+.kind-option:hover {
+  border-color: var(--primary);
+}
+/* Il riquadro selezionato si riconosce dal bordo, non solo dal pallino. */
+.kind-option:has(input:checked) {
+  border-color: var(--primary);
+  background: var(--surface-2);
+  font-weight: 600;
+}
+
 .form-actions {
   display: flex;
   gap: 0.6rem;

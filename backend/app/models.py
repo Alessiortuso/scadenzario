@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import enum
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timezone
 
 from sqlalchemy import (
     Boolean,
@@ -9,14 +9,14 @@ from sqlalchemy import (
     DateTime,
     Enum,
     Float,
-    ForeignKey,
     Integer,
     JSON,
     String,
     Text,
+    Time,
     UniqueConstraint,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base, LocalBase
 
@@ -25,10 +25,23 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-class DeadlineStatus(str, enum.Enum):
+class ReminderStatus(str, enum.Enum):
     OPEN = "open"
     DONE = "done"
     CANCELLED = "cancelled"
+
+
+class ReminderKind(str, enum.Enum):
+    """Di che natura è il promemoria.
+
+    Non cambia il funzionamento degli avvisi — un appuntamento si preavvisa
+    come una scadenza — ma cambia il modo di leggerlo: "scade tra tre giorni"
+    ha senso per una scadenza, non per una riunione.
+    """
+
+    DEADLINE = "deadline"
+    APPOINTMENT = "appointment"
+    OTHER = "other"
 
 
 class Recurrence(str, enum.Enum):
@@ -39,13 +52,6 @@ class Recurrence(str, enum.Enum):
     YEARLY = "yearly"
 
 
-class Priority(str, enum.Enum):
-    LOW = "low"
-    NORMAL = "normal"
-    HIGH = "high"
-    CRITICAL = "critical"
-
-
 class NotificationStatus(str, enum.Enum):
     PENDING = "pending"
     SENT = "sent"
@@ -53,34 +59,24 @@ class NotificationStatus(str, enum.Enum):
     CANCELLED = "cancelled"
 
 
-class Category(Base):
-    __tablename__ = "categories"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(120), unique=True)
-    color: Mapped[str] = mapped_column(String(9), default="#6366f1")
-    # Preavvisi in giorni; se None si usano quelli globali.
-    alert_offsets: Mapped[list[int] | None] = mapped_column(JSON, default=None)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-
-    deadlines: Mapped[list[Deadline]] = relationship(back_populates="category")
-
-
-class Deadline(Base):
-    __tablename__ = "deadlines"
+class Reminder(Base):
+    __tablename__ = "reminders"
     __table_args__ = (
-        UniqueConstraint("source", "external_id", name="uq_deadline_source_external"),
+        UniqueConstraint("source", "external_id", name="uq_reminder_source_external"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str] = mapped_column(String(255), index=True)
     description: Mapped[str | None] = mapped_column(Text, default=None)
     due_date: Mapped[date] = mapped_column(Date, index=True)
-    status: Mapped[DeadlineStatus] = mapped_column(
-        Enum(DeadlineStatus, native_enum=False, length=16), default=DeadlineStatus.OPEN, index=True
+    #: Ora di inizio, facoltativa: un appuntamento ce l'ha, una scadenza di
+    #: solito no. Senza orario il promemoria vale per l'intera giornata.
+    start_time: Mapped[time | None] = mapped_column(Time, default=None)
+    kind: Mapped[ReminderKind] = mapped_column(
+        Enum(ReminderKind, native_enum=False, length=16), default=ReminderKind.DEADLINE, index=True
     )
-    priority: Mapped[Priority] = mapped_column(
-        Enum(Priority, native_enum=False, length=16), default=Priority.NORMAL
+    status: Mapped[ReminderStatus] = mapped_column(
+        Enum(ReminderStatus, native_enum=False, length=16), default=ReminderStatus.OPEN, index=True
     )
     recurrence: Mapped[Recurrence] = mapped_column(
         Enum(Recurrence, native_enum=False, length=16), default=Recurrence.NONE
@@ -89,10 +85,7 @@ class Deadline(Base):
     owner: Mapped[str | None] = mapped_column(String(120), default=None)
     reference: Mapped[str | None] = mapped_column(String(120), default=None)
 
-    category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id", ondelete="SET NULL"))
-    category: Mapped[Category | None] = relationship(back_populates="deadlines")
-
-    # Preavvisi specifici della scadenza; se None si eredita da categoria/globale.
+    # Preavvisi specifici del promemoria; se None si usano quelli globali.
     alert_offsets: Mapped[list[int] | None] = mapped_column(JSON, default=None)
     notify_emails: Mapped[list[str] | None] = mapped_column(JSON, default=None)
 
@@ -111,15 +104,15 @@ class Deadline(Base):
 
     @property
     def is_overdue(self) -> bool:
-        return self.status == DeadlineStatus.OPEN and self.due_date < date.today()
+        return self.status == ReminderStatus.OPEN and self.due_date < date.today()
 
 
 class Notification(LocalBase):
-    """Un avviso generato per una scadenza a un dato preavviso.
+    """Un avviso generato per un promemoria a un dato preavviso.
 
     Vive nel database **locale**: ogni postazione mostra e traccia i propri
-    avvisi. Per questo `deadline_id` è un semplice riferimento numerico alla
-    scadenza nel database condiviso, non una foreign key.
+    avvisi. Per questo `reminder_id` è un semplice riferimento numerico al
+    promemoria nel database condiviso, non una foreign key.
 
     `dedupe_key` garantisce che lo stesso avviso non venga mostrato due volte.
     """
@@ -127,7 +120,7 @@ class Notification(LocalBase):
     __tablename__ = "notifications"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    deadline_id: Mapped[int] = mapped_column(Integer, index=True)
+    reminder_id: Mapped[int] = mapped_column(Integer, index=True)
 
     dedupe_key: Mapped[str] = mapped_column(String(190), unique=True, index=True)
     offset_days: Mapped[int] = mapped_column(Integer)

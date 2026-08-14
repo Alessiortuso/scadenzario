@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Scadenzario — processo principale Electron.
+ * Promemoria — processo principale Electron.
  *
  * Responsabilità:
  *  - avviare il backend (in sviluppo: uvicorn dal venv; in produzione: eseguibile impacchettato);
@@ -26,11 +26,11 @@ const { spawn } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs');
 
-const DEV = process.env.SCADENZARIO_DEV === '1';
+const DEV = process.env.PROMEMORIA_DEV === '1';
 // Schema dei collegamenti delle notifiche. Distinto in sviluppo per la stessa
 // ragione dell'identità: non rubare all'app installata i propri collegamenti.
-const PROTOCOL = app.isPackaged ? 'scadenzario' : 'scadenzario-sviluppo';
-const PORT = Number(process.env.SCADENZARIO_PORT || 8010);
+const PROTOCOL = app.isPackaged ? 'promemoria' : 'promemoria-sviluppo';
+const PORT = Number(process.env.PROMEMORIA_PORT || 8010);
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 const POLL_MS = 30_000;
 
@@ -42,8 +42,13 @@ let quitting = false;
 let interfacciaPronta = false;
 let rottaInAttesa = null;
 
+//: Schemi riconosciuti nei collegamenti delle notifiche. Quelli `scadenzario://`
+//: restano validi: un toast mostrato prima dell'aggiornamento è ancora sullo
+//: schermo, e cliccarlo deve portare da qualche parte.
+const PROTOCOLLI = [PROTOCOL, 'scadenzario', 'scadenzario-sviluppo'];
+
 /**
- * Ricava la rotta dell'interfaccia da un collegamento `scadenzario://`.
+ * Ricava la rotta dell'interfaccia da un collegamento `promemoria://`.
  *
  * Windows non consegna l'attivazione al processo già in esecuzione: lancia
  * l'eseguibile una seconda volta passando il collegamento fra gli argomenti.
@@ -52,10 +57,10 @@ let rottaInAttesa = null;
  * funzione li legge.
  */
 function rottaDaArgomenti(argomenti) {
-  const collegamento = argomenti.find((a) => a.startsWith(`${PROTOCOL}://`));
+  const collegamento = argomenti.find((a) => PROTOCOLLI.some((p) => a.startsWith(`${p}://`)));
   if (!collegamento) return null;
   try {
-    // scadenzario://scadenze/12  ->  /scadenze/12
+    // promemoria://promemoria/12  ->  /promemoria/12
     const url = new URL(collegamento);
     const rotta = `/${url.hostname}${url.pathname}`.replace(/\/+$/, '');
     return rotta || null;
@@ -83,7 +88,7 @@ function backendCommand() {
       cwd: path.join(__dirname, '..', 'backend'),
     };
   }
-  const exe = path.join(process.resourcesPath, 'backend', 'scadenzario-backend.exe');
+  const exe = path.join(process.resourcesPath, 'backend', 'promemoria-backend.exe');
   return { command: exe, args: ['--port', String(PORT)], cwd: path.dirname(exe) };
 }
 
@@ -134,9 +139,10 @@ function iconPath() {
 
 // L'.ico contiene la stessa icona disegnata a più misure (16, 24, 32, ... 256).
 // Caricandolo per intero Electron tiene la più grande e lascia che sia Windows
-// a rimpicciolirla: nella tray, che è alta 16 punti, la "S" si impasta e non si
+// a rimpicciolirla: nella tray, che è alta 16 punti, la "P" si impasta e non si
 // riconosce più. Qui peschiamo dal file la misura giusta, quella disegnata
-// apposta per quello spazio.
+// apposta per quello spazio — alle misure piccole è la variante senza spunta
+// (vedi assets/make_icon.py).
 function icoRepresentation(file, wanted) {
   const data = fs.readFileSync(file);
   if (data.length < 6 || data.readUInt16LE(2) !== 1) return null;
@@ -178,15 +184,15 @@ function createWindow() {
     minHeight: 600,
     show: false,
     icon: iconPath(),
-    title: 'Scadenzario',
+    title: 'Promemoria',
     autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true },
   });
 
   // Di norma l'interfaccia è quella compilata e servita dal backend stesso.
   // Per lavorare sul frontend con ricaricamento a caldo:
-  //   $env:SCADENZARIO_UI = 'http://localhost:4300'
-  mainWindow.loadURL(process.env.SCADENZARIO_UI || BASE_URL);
+  //   $env:PROMEMORIA_UI = 'http://localhost:4300'
+  mainWindow.loadURL(process.env.PROMEMORIA_UI || BASE_URL);
   mainWindow.once('ready-to-show', () => mainWindow.show());
 
   // Ricaricando la pagina l'ascoltatore va perso e si riparte dall'attesa.
@@ -246,11 +252,11 @@ ipcMain.on('interfaccia-pronta', (event) => {
 function createTray() {
   const { scaleFactor } = screen.getPrimaryDisplay();
   tray = new Tray(iconImage(Math.round(16 * scaleFactor)));
-  tray.setToolTip('Scadenzario');
+  tray.setToolTip('Promemoria');
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: 'Apri Scadenzario', click: () => showWindow() },
-      { label: 'Controlla scadenze adesso', click: () => runCycleNow() },
+      { label: 'Apri Promemoria', click: () => showWindow() },
+      { label: 'Controlla adesso', click: () => runCycleNow() },
       { type: 'separator' },
       {
         label: "Avvia all'avvio di Windows",
@@ -339,7 +345,7 @@ function reminderToastXml(item) {
   const image = logo
     ? `<image placement="appLogoOverride" src="file:///${logo.replace(/\\/g, '/')}"/>`
     : '';
-  const collegamento = `${PROTOCOL}://scadenze`;
+  const collegamento = `${PROTOCOL}://promemoria`;
 
   return `<toast scenario="reminder" activationType="protocol" launch="${collegamento}">
   <visual>
@@ -350,7 +356,7 @@ function reminderToastXml(item) {
     </binding>
   </visual>
   <actions>
-    <action content="Apri scadenza" activationType="protocol" arguments="${collegamento}"/>
+    <action content="Apri promemoria" activationType="protocol" arguments="${collegamento}"/>
     <action content="" arguments="dismiss" activationType="system"/>
   </actions>
 </toast>`;
@@ -378,7 +384,7 @@ async function pollNotifications() {
         toastXml: process.platform === 'win32' ? reminderToastXml(item) : undefined,
       });
       // Fuori da Windows non c'è il toastXml e l'attivazione arriva di qui.
-      toast.on('click', () => showWindow('/scadenze'));
+      toast.on('click', () => showWindow('/promemoria'));
       toast.show();
 
       await fetch(`${BASE_URL}/api/notifications/${item.id}/displayed`, { method: 'POST' });
@@ -403,7 +409,7 @@ function setupUpdater() {
     const { autoUpdater } = require('electron-updater');
     autoUpdater.on('update-downloaded', () => {
       new Notification({
-        title: 'Scadenzario aggiornato',
+        title: 'Promemoria aggiornato',
         body: "La nuova versione verrà applicata alla prossima chiusura dell'applicazione.",
       }).show();
     });
@@ -429,6 +435,12 @@ app.whenReady().then(async () => {
   // Windows assocerebbe a "it.scadenzario.desktop" l'icona di Electron —
   // l'atomo — e la terrebbe poi anche per l'app vera. Da qui un'identità
   // separata quando non siamo impacchettati.
+  //
+  // L'identità resta "scadenzario" anche ora che l'app si chiama Promemoria:
+  // è la stessa dell'`appId` di electron-builder, e cambiarla farebbe
+  // installare la nuova versione **accanto** alla vecchia invece che al suo
+  // posto, lasciando due applicazioni sulle postazioni. È un identificatore
+  // interno: nessuno lo legge.
   app.setAppUserModelId(app.isPackaged ? 'it.scadenzario.desktop' : 'it.scadenzario.desktop.sviluppo');
   registraProtocollo();
   startBackend();

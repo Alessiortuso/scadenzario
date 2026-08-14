@@ -1,0 +1,279 @@
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.1rem;
+}
+.page-head p {
+  margin: 0;
+}
+
+.toolbar-card {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.month-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.month-label {
+  min-width: 11ch;
+  text-align: center;
+  font-size: 1.05rem;
+}
+
+.filters {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding-bottom: 0.45rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.calendar-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+.calendar-layout.with-panel {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+}
+
+.calendar.loading {
+  opacity: 0.6;
+}
+
+.weekdays,
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.weekdays {
+  gap: 1px;
+  margin-bottom: 0.4rem;
+}
+.weekdays span {
+  padding: 0.25rem 0.4rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Le celle si toccano: il reticolo nasce dal gap sul colore del bordo, così
+   non serve gestire i bordi doppi fra celle adiacenti. */
+.grid {
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.day {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-height: 108px;
+  padding: 0.35rem 0.4rem 0.45rem;
+  background: var(--surface);
+  cursor: pointer;
+}
+.day:hover {
+  background: var(--surface-2);
+}
+.day.outside {
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+.day.outside .number {
+  opacity: 0.55;
+}
+.day.selected {
+  box-shadow: inset 0 0 0 2px var(--primary);
+}
+
+.day-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.3rem;
+}
+.number {
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.day.today .number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+}
+
+/* Il "+" resta nascosto finché non si passa sulla cella: sette righe di
+   pulsanti sempre visibili sarebbero più rumore che aiuto. */
+.add {
+  opacity: 0;
+  border: 0;
+  background: none;
+  padding: 0 0.25rem;
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.day:hover .add,
+.add:focus-visible {
+  opacity: 1;
+}
+.add:hover {
+  background: var(--surface-2);
+  color: var(--primary);
+}
+
+.items {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  width: 100%;
+  padding: 0.12rem 0.3rem;
+  border: 0;
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: inherit;
+  font: inherit;
+  font-size: 0.76rem;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+.item:hover {
+  background: var(--border);
+}
+.item .label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.item .hour {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+.item.done .label {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+.item.overdue {
+  box-shadow: inset 2px 0 0 var(--danger);
+}
+
+.dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+}
+
+.more {
+  padding-left: 0.3rem;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+/* ------------------------------------------------------- pannello del giorno */
+
+.day-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+.day-panel header strong {
+  text-transform: capitalize;
+}
+
+.day-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.day-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.day-list li:last-child {
+  border-bottom: 0;
+}
+.day-list .dot {
+  margin-top: 0.4rem;
+}
+.day-list .info {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1;
+}
+.day-list li.done a {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.add-here {
+  width: 100%;
+  margin-top: 0.9rem;
+}
+
+@media (max-width: 1000px) {
+  .calendar-layout.with-panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .day {
+    min-height: 76px;
+  }
+  .item .label {
+    display: none;
+  }
+  .toolbar-card {
+    align-items: stretch;
+  }
+}

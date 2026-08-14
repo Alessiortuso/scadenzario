@@ -1,16 +1,18 @@
 import { CurrencyPipe, DatePipe } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { ApiService } from '../../core/api.service';
-import { Deadline, DeadlineStats } from '../../core/models';
+import { KIND_LABELS, Reminder, ReminderKind, ReminderStats } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { DueBadge } from '../../shared/due-badge';
+import { KindIcon } from '../../shared/kind-icon';
+import { TimeLabelPipe } from '../../shared/time-label.pipe';
 
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink, DatePipe, CurrencyPipe, DueBadge],
+  imports: [RouterLink, DatePipe, CurrencyPipe, DueBadge, KindIcon, TimeLabelPipe],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })
@@ -18,13 +20,11 @@ export class DashboardPage implements OnInit {
   private readonly api = inject(ApiService);
   private readonly toasts = inject(ToastService);
 
-  readonly stats = signal<DeadlineStats | null>(null);
-  readonly upcoming = signal<Deadline[]>([]);
-  readonly loading = signal(true);
+  readonly kindLabels = KIND_LABELS;
 
-  readonly maxCategoryCount = computed(() =>
-    Math.max(1, ...(this.stats()?.by_category ?? []).map((c) => c.count)),
-  );
+  readonly stats = signal<ReminderStats | null>(null);
+  readonly upcoming = signal<Reminder[]>([]);
+  readonly loading = signal(true);
 
   async ngOnInit(): Promise<void> {
     await this.reload();
@@ -46,9 +46,13 @@ export class DashboardPage implements OnInit {
     }
   }
 
-  async complete(deadline: Deadline): Promise<void> {
-    await firstValueFrom(this.api.completeDeadline(deadline.id));
-    this.toasts.success(`«${deadline.title}» segnata come evasa`);
+  kindLabel(kind: ReminderKind): string {
+    return KIND_LABELS[kind];
+  }
+
+  async complete(reminder: Reminder): Promise<void> {
+    await firstValueFrom(this.api.completeReminder(reminder.id));
+    this.toasts.success(`«${reminder.title}» segnato come completato`);
     await this.reload();
   }
 }

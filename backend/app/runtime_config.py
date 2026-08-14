@@ -2,7 +2,7 @@
 
 Le credenziali del database condiviso **non** vengono impacchettate
 nell'installer: ogni postazione le riceve alla prima apertura e le salva in
-`%LOCALAPPDATA%\\Scadenzario\\config.json`. Così l'installer è un file neutro,
+`%LOCALAPPDATA%\\Promemoria\\config.json`. Così l'installer è un file neutro,
 pubblicabile senza esporre nulla, e cambiare la password del database non
 richiede di ridistribuire l'applicazione.
 

@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ...config import settings as env_settings
-from ...models import Deadline, Notification, PushSubscription
+from ...models import Notification, PushSubscription, Reminder
 from ...schemas import AppSettings
 from .base import ChannelResult, Notifier
 
@@ -21,9 +21,9 @@ def _payload(notification: Notification) -> str:
             "body": notification.body,
             "severity": notification.severity,
             "notificationId": notification.id,
-            "deadlineId": notification.deadline_id,
-            "url": f"/scadenze/{notification.deadline_id}",
-            "tag": f"deadline-{notification.deadline_id}",
+            "reminderId": notification.reminder_id,
+            "url": f"/promemoria/{notification.reminder_id}",
+            "tag": f"reminder-{notification.reminder_id}",
         },
         ensure_ascii=False,
     )
@@ -79,7 +79,7 @@ class WebPushNotifier(Notifier):
         self,
         db: Session,
         notification: Notification,
-        deadline: Deadline | None,
+        reminder: Reminder | None,
         app_settings: AppSettings,
     ) -> ChannelResult:
         sent, failed, details = send_raw(db, _payload(notification))

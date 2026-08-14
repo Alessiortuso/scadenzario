@@ -1,6 +1,12 @@
 import { Component, computed, input } from '@angular/core';
 
-/** Etichetta colorata che riassume quanto manca a una scadenza. */
+import { ReminderKind } from '../core/models';
+
+/** Etichetta colorata che riassume quanto manca a un promemoria.
+ *
+ * Il verbo segue il tipo: una scadenza «scade», un appuntamento no. Dire
+ * «scade domani» di una riunione è italiano sbagliato, non una sfumatura.
+ */
 @Component({
   selector: 'app-due-badge',
   template: `<span class="badge" [class]="'badge badge-' + tone()">{{ label() }}</span>`,
@@ -8,6 +14,7 @@ import { Component, computed, input } from '@angular/core';
 export class DueBadge {
   readonly days = input.required<number>();
   readonly done = input(false);
+  readonly kind = input<ReminderKind>('deadline');
 
   readonly tone = computed(() => {
     if (this.done()) return 'neutral';
@@ -20,11 +27,16 @@ export class DueBadge {
   });
 
   readonly label = computed(() => {
-    if (this.done()) return 'Evasa';
+    const scadenza = this.kind() === 'deadline';
+    if (this.done()) return scadenza ? 'Evasa' : 'Fatto';
+
     const d = this.days();
-    if (d < 0) return `Scaduta da ${Math.abs(d)} gg`;
-    if (d === 0) return 'Scade oggi';
-    if (d === 1) return 'Scade domani';
+    if (d < 0) {
+      const gg = Math.abs(d);
+      return scadenza ? `Scaduta da ${gg} gg` : `${gg} gg fa`;
+    }
+    if (d === 0) return scadenza ? 'Scade oggi' : 'Oggi';
+    if (d === 1) return scadenza ? 'Scade domani' : 'Domani';
     return `Tra ${d} gg`;
   });
 }

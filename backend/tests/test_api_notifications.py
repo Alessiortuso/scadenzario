@@ -8,12 +8,12 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 
 from app.api import notifications as notifications_api
-from app.models import DeadlineStatus, Notification, NotificationStatus
+from app.models import ReminderStatus, Notification, NotificationStatus
 
 
-def _avviso_consegnato(local_db, deadline_id: int, *, chiave: str = "k1") -> Notification:
+def _avviso_consegnato(local_db, reminder_id: int, *, chiave: str = "k1") -> Notification:
     notifica = Notification(
-        deadline_id=deadline_id,
+        reminder_id=reminder_id,
         dedupe_key=chiave,
         offset_days=0,
         title="Scade oggi: prova",
@@ -28,20 +28,20 @@ def _avviso_consegnato(local_db, deadline_id: int, *, chiave: str = "k1") -> Not
     return notifica
 
 
-def test_to_display_restituisce_gli_avvisi_di_scadenze_aperte(client, local_db, make_deadline):
-    deadline = make_deadline(0)
-    _avviso_consegnato(local_db, deadline.id)
+def test_to_display_restituisce_gli_avvisi_di_scadenze_aperte(client, local_db, make_reminder):
+    reminder = make_reminder(0)
+    _avviso_consegnato(local_db, reminder.id)
 
     risposta = client.get("/api/notifications/to-display")
 
     assert risposta.status_code == 200
-    assert [n["deadline_id"] for n in risposta.json()] == [deadline.id]
+    assert [n["reminder_id"] for n in risposta.json()] == [reminder.id]
 
 
-def test_to_display_annulla_gli_avvisi_di_scadenze_gia_evase(client, shared_db, local_db, make_deadline):
-    deadline = make_deadline(0)
-    notifica = _avviso_consegnato(local_db, deadline.id)
-    deadline.status = DeadlineStatus.DONE
+def test_to_display_annulla_gli_avvisi_di_scadenze_gia_evase(client, shared_db, local_db, make_reminder):
+    reminder = make_reminder(0)
+    notifica = _avviso_consegnato(local_db, reminder.id)
+    reminder.status = ReminderStatus.DONE
     shared_db.commit()
 
     risposta = client.get("/api/notifications/to-display")
@@ -53,28 +53,28 @@ def test_to_display_annulla_gli_avvisi_di_scadenze_gia_evase(client, shared_db, 
 
 
 def test_to_display_mostra_comunque_se_il_condiviso_non_risponde(
-    client, local_db, make_deadline, monkeypatch
+    client, local_db, make_reminder, monkeypatch
 ):
     """Neon in standby o rete assente: un promemoria di troppo si ignora, uno
     mancato fa perdere una scadenza."""
-    deadline = make_deadline(0)
-    notifica = _avviso_consegnato(local_db, deadline.id)
+    reminder = make_reminder(0)
+    notifica = _avviso_consegnato(local_db, reminder.id)
 
     monkeypatch.setattr(notifications_api, "is_shared_configured", lambda: False)
 
     risposta = client.get("/api/notifications/to-display")
 
     assert risposta.status_code == 200
-    assert [n["deadline_id"] for n in risposta.json()] == [deadline.id]
+    assert [n["reminder_id"] for n in risposta.json()] == [reminder.id]
     local_db.refresh(notifica)
     assert notifica.status == NotificationStatus.SENT, "l'avviso non va annullato al buio"
 
 
 def test_to_display_sopravvive_a_un_errore_del_database_condiviso(
-    client, local_db, make_deadline, monkeypatch
+    client, local_db, make_reminder, monkeypatch
 ):
-    deadline = make_deadline(0)
-    _avviso_consegnato(local_db, deadline.id)
+    reminder = make_reminder(0)
+    _avviso_consegnato(local_db, reminder.id)
 
     from sqlalchemy.exc import OperationalError
 
@@ -90,22 +90,22 @@ def test_to_display_sopravvive_a_un_errore_del_database_condiviso(
     risposta = client.get("/api/notifications/to-display")
 
     assert risposta.status_code == 200
-    assert [n["deadline_id"] for n in risposta.json()] == [deadline.id]
+    assert [n["reminder_id"] for n in risposta.json()] == [reminder.id]
 
 
-def test_marcare_mostrato_non_ripresenta_il_toast(client, local_db, make_deadline):
-    deadline = make_deadline(0)
-    notifica = _avviso_consegnato(local_db, deadline.id)
+def test_marcare_mostrato_non_ripresenta_il_toast(client, local_db, make_reminder):
+    reminder = make_reminder(0)
+    notifica = _avviso_consegnato(local_db, reminder.id)
 
     assert client.post(f"/api/notifications/{notifica.id}/displayed").status_code == 204
     assert client.get("/api/notifications/to-display").json() == []
 
 
-def test_gli_orari_arrivano_al_browser_con_il_fuso(client, local_db, make_deadline):
+def test_gli_orari_arrivano_al_browser_con_il_fuso(client, local_db, make_reminder):
     """Senza offset il browser li interpreta come ora locale e mostra un orario
     sbagliato: `scheduled_for` deve essere esplicitamente in UTC."""
-    deadline = make_deadline(0)
-    _avviso_consegnato(local_db, deadline.id)
+    reminder = make_reminder(0)
+    _avviso_consegnato(local_db, reminder.id)
 
     quando = client.get("/api/notifications").json()[0]["scheduled_for"]
 
@@ -113,11 +113,11 @@ def test_gli_orari_arrivano_al_browser_con_il_fuso(client, local_db, make_deadli
     assert datetime.fromisoformat(quando.replace("Z", "+00:00")).tzinfo is not None
 
 
-def test_eliminare_una_scadenza_ripulisce_gli_avvisi_locali(client, local_db, make_deadline):
+def test_eliminare_una_scadenza_ripulisce_gli_avvisi_locali(client, local_db, make_reminder):
     """Altrimenti la campanella rimanderebbe a una scadenza che non esiste."""
-    deadline = make_deadline(30, alert_offsets=[7])
-    _avviso_consegnato(local_db, deadline.id)
+    reminder = make_reminder(30, alert_offsets=[7])
+    _avviso_consegnato(local_db, reminder.id)
 
-    assert client.delete(f"/api/deadlines/{deadline.id}").status_code == 204
+    assert client.delete(f"/api/reminders/{reminder.id}").status_code == 204
 
     assert local_db.scalars(select(Notification)).all() == []

@@ -1,13 +1,13 @@
 {
-  "name": "scadenzario-desktop",
-  "productName": "Scadenzario",
-  "version": "1.0.5",
-  "description": "Scadenzario — avvisi e notifiche desktop",
+  "name": "promemoria-desktop",
+  "productName": "Promemoria",
+  "version": "1.1.0",
+  "description": "Promemoria — scadenze, appuntamenti e avvisi desktop",
   "main": "main.js",
   "private": true,
   "scripts": {
     "start": "electron .",
-    "dev": "cross-env SCADENZARIO_DEV=1 electron .",
+    "dev": "cross-env PROMEMORIA_DEV=1 electron .",
     "dist": "electron-builder"
   },
   "devDependencies": {
@@ -20,10 +20,10 @@
   },
   "build": {
     "appId": "it.scadenzario.desktop",
-    "productName": "Scadenzario",
+    "productName": "Promemoria",
     "directories": { "output": "release" },
     "files": ["main.js", "preload.js", "assets/**/*"],
-    "extraResources": [{ "from": "../backend/dist/scadenzario-backend", "to": "backend" }],
+    "extraResources": [{ "from": "../backend/dist/promemoria-backend", "to": "backend" }],
     "win": {
       "target": ["nsis"],
       "icon": "assets/icon.ico"
@@ -33,7 +33,7 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "shortcutName": "Scadenzario"
+      "shortcutName": "Promemoria"
     },
     "publish": [
       {
