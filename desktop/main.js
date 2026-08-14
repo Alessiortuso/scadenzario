@@ -193,7 +193,7 @@ function createWindow() {
   // Per lavorare sul frontend con ricaricamento a caldo:
   //   $env:PROMEMORIA_UI = 'http://localhost:4300'
   mainWindow.loadURL(process.env.PROMEMORIA_UI || BASE_URL);
-  mainWindow.once('ready-to-show', () => mainWindow.show());
+  mainWindow.once('ready-to-show', () => portaInPrimoPiano());
 
   // Ricaricando la pagina l'ascoltatore va perso e si riparte dall'attesa.
   // Vale solo per un vero cambio di documento: `did-start-loading` sembrava
@@ -221,13 +221,36 @@ function createWindow() {
   });
 }
 
+/**
+ * Mostra la finestra e le fa arrivare davvero il fuoco della tastiera.
+ *
+ * `show()` da solo non basta. Windows protegge chi sta lavorando dalle
+ * finestre che rubano la tastiera: se in quel momento il primo piano
+ * appartiene a un altro processo — l'installer appena finito, Esplora
+ * risorse, il programma da cui l'app è stata lanciata — il passaggio del
+ * fuoco viene *rifiutato in silenzio*. La finestra compare, si può cliccare,
+ * le tendine si aprono col mouse, ma i tasti continuano ad andare altrove: nei
+ * campi di testo non si scrive e sembra che l'applicazione sia rotta.
+ *
+ * Il giro da cima-a-tutto e ritorno passa da una chiamata che Windows concede
+ * anche quando nega il primo piano, e trascina con sé l'attivazione. Costa
+ * niente e sui computer dove il fuoco arriva da sé non si nota.
+ */
+function portaInPrimoPiano() {
+  if (mainWindow === null) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+
+  mainWindow.show();
+  mainWindow.setAlwaysOnTop(true);
+  mainWindow.setAlwaysOnTop(false);
+  mainWindow.focus();
+}
+
 function showWindow(route) {
   if (mainWindow === null) {
     createWindow();
   } else {
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.show();
-    mainWindow.focus();
+    portaInPrimoPiano();
   }
   if (!route) return;
 
