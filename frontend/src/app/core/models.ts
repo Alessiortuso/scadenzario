@@ -203,6 +203,8 @@ export interface SetupStatus {
   source: 'config' | 'env' | 'none';
   device_name: string;
   email_sender_device: boolean;
+  /** Perché la postazione non è collegata, quando una configurazione c'è già. */
+  last_error: string | null;
 }
 
 export interface ConnectionTestResult {

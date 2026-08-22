@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from .. import runtime_config
+from .. import db as db_module
 from ..db import configure_shared, is_shared_configured
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,10 @@ class SetupStatus(BaseModel):
     source: str
     device_name: str
     email_sender_device: bool
+    #: Perché la postazione non è collegata pur avendo una configurazione: si
+    #: mostra in cima alla schermata, così l'utente sa se il rimedio è
+    #: riscrivere la stringa o aggiornare l'applicazione.
+    last_error: str | None = None
 
 
 class ConnectionTest(BaseModel):
@@ -73,6 +78,7 @@ def status() -> SetupStatus:
         source=runtime_config.source(),
         device_name=runtime_config.device_name(),
         email_sender_device=runtime_config.email_sender_device(),
+        last_error=None if is_shared_configured() else db_module.shared_error,
     )
 
 

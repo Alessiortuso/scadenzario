@@ -46,6 +46,12 @@ LocalSession = sessionmaker(bind=local_engine, autoflush=False, expire_on_commit
 SharedSession = sessionmaker(autoflush=False, expire_on_commit=False)
 shared_engine: Engine | None = None
 
+#: Perché l'ultimo tentativo di collegamento è fallito. Senza questo la
+#: schermata di configurazione dice solo «manca la configurazione», e chi ha un
+#: `config.json` valido ma uno schema che non si prepara riscrive le credenziali
+#: per niente — è successo davvero, su tutte le postazioni in una volta.
+shared_error: str | None = None
+
 
 class Base(DeclarativeBase):
     """Tabelle del database condiviso."""
@@ -57,17 +63,22 @@ class LocalBase(DeclarativeBase):
 
 def configure_shared(url: str, *, migrate: bool = False) -> Engine:
     """Collega (o ricollega) il database condiviso all'URL indicato."""
-    global shared_engine
+    global shared_engine, shared_error
 
     engine = _make_engine(url)
 
     if migrate:
         from . import migrations, models  # noqa: F401  (i modelli registrano i metadata)
 
-        migrations.upgrade(engine, "shared")
+        try:
+            migrations.upgrade(engine, "shared")
+        except Exception as exc:
+            shared_error = str(exc).splitlines()[0]
+            raise
 
     SharedSession.configure(bind=engine)
     shared_engine = engine
+    shared_error = None
     return engine
 
 

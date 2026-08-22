@@ -21,6 +21,11 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Prima riga di ogni sessione: quale versione sta girando su questa
+    # postazione. Diagnosticare a distanza senza saperlo è indovinare.
+    logging.getLogger(__name__).info(
+        "%s %s — postazione %s", settings.app_name, app.version, runtime_config.device_name()
+    )
     try:
         init_db()
     except Exception:

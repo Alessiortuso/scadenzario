@@ -8,6 +8,17 @@
     </p>
   </header>
 
+  @if (status()?.last_error; as errore) {
+    <div class="card guasto">
+      <strong>Questa postazione ha già una configurazione, ma il collegamento non è riuscito.</strong>
+      <p class="small">{{ errore }}</p>
+      <p class="small muted">
+        Se il messaggio parla di una revisione sconosciuta, la stringa di connessione è giusta e non va riscritta:
+        serve aggiornare Promemoria su questo computer.
+      </p>
+    </div>
+  }
+
   @if (status()?.configured) {
     <div class="card note">
       <strong>Questa postazione è già collegata.</strong>

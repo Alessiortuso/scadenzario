@@ -41,6 +41,8 @@ let pollTimer = null;
 let quitting = false;
 let interfacciaPronta = false;
 let rottaInAttesa = null;
+//: Aggiornamento scaricato e in attesa di essere applicato.
+let aggiornamentoPronto = false;
 //: Misura dell'icona della tray su questo schermo: serve a ridisegnarla con e
 //: senza bollino senza ricalcolare ogni volta il fattore di scala.
 let dimensioneTray = 16;
@@ -223,6 +225,27 @@ function createWindow() {
     }
   });
 
+  // Tasto destro nei campi di testo: taglia, copia, incolla.
+  //
+  // Senza questo il menu contestuale non esiste — Electron non ne mette uno di
+  // suo — e chi incolla col tasto destro, cioè quasi tutti, conclude che
+  // l'applicazione non lo permetta. Sulla schermata di configurazione significa
+  // ricopiare a mano una stringa di connessione lunga e piena di caratteri
+  // insidiosi, con gli errori di battitura che ne seguono.
+  mainWindow.webContents.on('context-menu', (_event, params) => {
+    const modificabile = params.isEditable;
+    const selezione = params.selectionText.trim().length > 0;
+    if (!modificabile && !selezione) return;
+
+    Menu.buildFromTemplate([
+      { role: 'cut', label: 'Taglia', enabled: modificabile && selezione },
+      { role: 'copy', label: 'Copia', enabled: selezione },
+      { role: 'paste', label: 'Incolla', enabled: modificabile },
+      { type: 'separator' },
+      { role: 'selectAll', label: 'Seleziona tutto' },
+    ]).popup({ window: mainWindow });
+  });
+
   // I link esterni si aprono nel browser, non dentro l'applicazione.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
@@ -283,32 +306,41 @@ ipcMain.on('interfaccia-pronta', (event) => {
   }
 });
 
+function menuTray() {
+  return Menu.buildFromTemplate([
+    { label: 'Apri Promemoria', click: () => showWindow() },
+    { label: 'Controlla adesso', click: () => runCycleNow() },
+    { type: 'separator' },
+    // La versione in chiaro: quando una postazione si comporta diversamente
+    // dalle altre, è la prima cosa da sapere e nessuno sa dove guardare.
+    { label: `Versione ${app.getVersion()}`, enabled: false },
+    ...(aggiornamentoPronto
+      ? [{ label: 'Riavvia e aggiorna', click: () => installaAggiornamento() }]
+      : []),
+    { type: 'separator' },
+    {
+      label: "Avvia all'avvio di Windows",
+      type: 'checkbox',
+      checked: app.getLoginItemSettings().openAtLogin,
+      click: (item) => app.setLoginItemSettings({ openAtLogin: item.checked, openAsHidden: true }),
+    },
+    { type: 'separator' },
+    {
+      label: 'Esci',
+      click: () => {
+        quitting = true;
+        app.quit();
+      },
+    },
+  ]);
+}
+
 function createTray() {
   const { scaleFactor } = screen.getPrimaryDisplay();
   dimensioneTray = Math.round(16 * scaleFactor);
   tray = new Tray(iconImage(dimensioneTray));
-  tray.setToolTip('Promemoria');
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      { label: 'Apri Promemoria', click: () => showWindow() },
-      { label: 'Controlla adesso', click: () => runCycleNow() },
-      { type: 'separator' },
-      {
-        label: "Avvia all'avvio di Windows",
-        type: 'checkbox',
-        checked: app.getLoginItemSettings().openAtLogin,
-        click: (item) => app.setLoginItemSettings({ openAtLogin: item.checked, openAsHidden: true }),
-      },
-      { type: 'separator' },
-      {
-        label: 'Esci',
-        click: () => {
-          quitting = true;
-          app.quit();
-        },
-      },
-    ]),
-  );
+  tray.setToolTip(`Promemoria ${app.getVersion()}`);
+  tray.setContextMenu(menuTray());
   tray.on('double-click', () => showWindow());
 }
 
@@ -499,15 +531,42 @@ function startPolling() {
 
 // --------------------------------------------------------- aggiornamenti
 
+/**
+ * Applica l'aggiornamento già scaricato, chiudendo davvero l'applicazione.
+ *
+ * `quitAndInstall` passa dal ciclo di uscita normale, e la X di questa app non
+ * chiude ma nasconde: senza alzare `quitting` l'installer resterebbe in attesa
+ * di una chiusura che non arriva.
+ */
+function installaAggiornamento() {
+  try {
+    quitting = true;
+    require('electron-updater').autoUpdater.quitAndInstall();
+  } catch (err) {
+    console.error('Installazione aggiornamento fallita:', err);
+    quitting = false;
+  }
+}
+
 function setupUpdater() {
   if (DEV || !app.isPackaged) return;
   try {
     const { autoUpdater } = require('electron-updater');
     autoUpdater.on('update-downloaded', () => {
-      new Notification({
-        title: 'Promemoria aggiornato',
-        body: "La nuova versione verrà applicata alla prossima chiusura dell'applicazione.",
-      }).show();
+      // L'installazione alla chiusura da sola non basta: l'applicazione vive
+      // nella tray e su molte postazioni non viene mai chiusa davvero, così la
+      // versione nuova resta scaricata e mai applicata per settimane. Con un
+      // database condiviso questo si paga: appena una postazione applica una
+      // migrazione, quelle rimaste indietro non riescono più a collegarsi.
+      aggiornamentoPronto = true;
+      if (tray) tray.setContextMenu(menuTray());
+
+      const avviso = new Notification({
+        title: 'Aggiornamento di Promemoria pronto',
+        body: 'Clicca qui per riavviare e applicarlo adesso, oppure verrà installato alla prossima chiusura.',
+      });
+      avviso.on('click', () => installaAggiornamento());
+      avviso.show();
     });
     autoUpdater.checkForUpdatesAndNotify();
     // Ricontrolla una volta al giorno per le installazioni sempre aperte.

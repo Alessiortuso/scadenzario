@@ -44,6 +44,19 @@ _WITNESS = {"shared": "deadlines", "local": "notifications"}
 
 _VERSION_TABLE = {"shared": "alembic_version", "local": "alembic_version_local"}
 
+_NOME = {"shared": "condiviso", "local": "di questa postazione"}
+
+
+class SchemaPiuRecente(RuntimeError):
+    """Il database è stato migrato da una versione più recente dell'app.
+
+    Succede sul condiviso appena una postazione si aggiorna prima delle altre:
+    quella applica la nuova revisione, e chi è rimasto indietro se la trova
+    scritta nel database senza avere il file che la descrive. Alembic da solo
+    direbbe soltanto «Can't locate revision identified by 0004», che non
+    suggerisce a nessuno la cosa da fare — cioè aggiornare l'applicazione.
+    """
+
 
 def _script_location() -> Path:
     """Dove stanno le migrazioni, in sviluppo e dentro l'eseguibile."""
@@ -72,6 +85,27 @@ def _current(connection: Connection, target: str) -> str | None:
     return context.get_current_revision()
 
 
+def _verifica_conoscenza(config: Config, current: str | None, target: str) -> None:
+    """Ferma l'aggiornamento se la revisione nel database è sconosciuta.
+
+    Andare avanti non è un'opzione: Alembic non sa da dove partire e le tabelle
+    hanno comunque una forma che questo codice non si aspetta. L'unica cosa
+    utile è dirlo con parole che indichino il rimedio.
+    """
+    if current is None:
+        return
+
+    script = ScriptDirectory.from_config(config)
+    try:
+        script.get_revision(current)
+    except Exception as exc:
+        raise SchemaPiuRecente(
+            f"Il database {_NOME[target]} è alla revisione {current}, che questa versione di "
+            "Promemoria non conosce: è stato aggiornato da una postazione con una versione più "
+            "recente. Aggiorna Promemoria su questo computer e riprova."
+        ) from exc
+
+
 def upgrade(engine: Engine, target: str) -> str | None:
     """Porta lo schema di `target` ("shared" o "local") all'ultima revisione.
 
@@ -93,6 +127,8 @@ def upgrade(engine: Engine, target: str) -> str | None:
         head = _head(config)
         if current == head:
             return current
+
+        _verifica_conoscenza(config, current, target)
 
         logger.info("Migrazione schema %s: %s -> %s", target, current or "vuoto", head)
         command.upgrade(config, "head")

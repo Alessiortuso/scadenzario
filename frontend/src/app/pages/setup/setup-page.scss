@@ -38,6 +38,16 @@ header p {
   word-break: break-all;
 }
 
+.guasto {
+  border-left: 4px solid var(--danger);
+}
+.guasto p {
+  margin: 0.35rem 0 0;
+}
+.guasto p:first-of-type {
+  color: var(--danger);
+}
+
 .grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
