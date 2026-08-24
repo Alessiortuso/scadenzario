@@ -1,7 +1,7 @@
 {
   "name": "promemoria-desktop",
   "productName": "Promemoria",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Promemoria — scadenze, appuntamenti e avvisi desktop",
   "main": "main.js",
   "private": true,
