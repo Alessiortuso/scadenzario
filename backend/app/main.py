@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -89,15 +89,39 @@ class SpaStaticFiles(StaticFiles):
     Le rotte dell'interfaccia (`/promemoria/12`, `/calendario`, ...) esistono
     solo lato browser: senza questo fallback un accesso diretto o un
     ricaricamento della pagina risponderebbe 404.
+
+    Due accortezze, imparate da una schermata bianca dopo un aggiornamento:
+
+    - il fallback vale **solo per le rotte**, non per i file. Un `.js` che non
+      esiste più deve rispondere 404: rispondendo `index.html` il browser si
+      ritrova dell'HTML dove si aspetta uno script, non esegue niente e mostra
+      una pagina bianca senza un errore che aiuti;
+    - `index.html` non si mette mai in cache. Ogni compilazione cambia il nome
+      degli script (`main-VBIVJOH5.js`), e senza `Cache-Control` il browser
+      applica la propria euristica: dopo un aggiornamento continuava a chiedere
+      i file della versione precedente, che non esistono più.
     """
 
     async def get_response(self, path: str, scope):
         try:
-            return await super().get_response(path, scope)
+            response = await super().get_response(path, scope)
+            servito = path
         except StarletteHTTPException as exc:
-            if exc.status_code == 404:
-                return await super().get_response("index.html", scope)
-            raise
+            # `PurePosixPath` e non `Path`: qui gli URL arrivano già normalizzati
+            # con le barre in avanti, anche su Windows.
+            if exc.status_code == 404 and not PurePosixPath(path).suffix:
+                response = await super().get_response("index.html", scope)
+                servito = "index.html"
+            else:
+                raise
+
+        if servito in ("", ".", "index.html"):
+            response.headers["Cache-Control"] = "no-store"
+        else:
+            # Il nome contiene già l'impronta del contenuto, ma una rivalidazione
+            # su 127.0.0.1 non costa nulla e toglie di mezzo una classe di guai.
+            response.headers["Cache-Control"] = "no-cache"
+        return response
 
 
 def _mount_frontend() -> None:

@@ -19,6 +19,7 @@ const {
   Notification,
   ipcMain,
   screen,
+  session,
   shell,
   nativeImage,
 } = require('electron');
@@ -181,6 +182,34 @@ function iconImage(wanted, avviso = false) {
   const file = iconPath(avviso) || iconPath();
   if (!file) return nativeImage.createEmpty();
   return icoRepresentation(file, wanted) || nativeImage.createFromPath(file);
+}
+
+/**
+ * Svuota la cache del browser quando la versione installata cambia.
+ *
+ * L'interfaccia arriva da 127.0.0.1 e a ogni compilazione cambia il nome dei
+ * suoi script. Se il browser tiene in cache l'`index.html` di prima, dopo un
+ * aggiornamento continua a chiedere file che non esistono più: finestra bianca,
+ * click che non fanno niente, e nessun errore visibile. Il backend adesso vieta
+ * di mettere in cache `index.html`, ma le postazioni che quella pagina l'hanno
+ * già memorizzata non lo verrebbero mai a sapere: qui si azzera il ricordo, che
+ * è l'unico modo per rimetterle in piedi da sole.
+ */
+async function svuotaCacheSeVersioneCambiata() {
+  const segnaposto = path.join(app.getPath('userData'), 'versione-interfaccia');
+  const versione = app.getVersion();
+  try {
+    if (fs.existsSync(segnaposto) && fs.readFileSync(segnaposto, 'utf8').trim() === versione) {
+      return;
+    }
+    await session.defaultSession.clearCache();
+    fs.writeFileSync(segnaposto, versione, 'utf8');
+    console.log(`Cache dell'interfaccia svuotata per la versione ${versione}`);
+  } catch (err) {
+    // Una cache non svuotata non deve impedire l'avvio: al massimo si ripiega
+    // sul ricaricamento forzato, Ctrl+Shift+R.
+    console.error('Svuotamento della cache non riuscito:', err);
+  }
 }
 
 function createWindow() {
@@ -600,6 +629,7 @@ app.whenReady().then(async () => {
   registraProtocollo();
   startBackend();
   createTray();
+  await svuotaCacheSeVersioneCambiata();
   await waitForBackend();
   createWindow();
 
