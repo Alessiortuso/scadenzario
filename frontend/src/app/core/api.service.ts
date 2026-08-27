@@ -16,6 +16,7 @@ import {
   NotificationCounts,
   PushSubscriptionInfo,
   Recurrence,
+  RecurrenceUnit,
   Reminder,
   ReminderKind,
   ReminderPage,
@@ -89,6 +90,8 @@ export class ApiService {
     due_date: string;
     recurrence: Recurrence;
     recurrence_until?: string | null;
+    recurrence_every?: number | null;
+    recurrence_unit?: RecurrenceUnit | null;
     amount?: number | null;
   }): Observable<Occurrence[]> {
     return this.http.get<Occurrence[]>(`${BASE}/reminders/occurrences`, {

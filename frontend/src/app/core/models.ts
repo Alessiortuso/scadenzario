@@ -1,6 +1,48 @@
 export type ReminderStatus = 'open' | 'done' | 'cancelled';
 export type ReminderKind = 'deadline' | 'appointment' | 'other';
-export type Recurrence = 'none' | 'monthly' | 'quarterly' | 'semiannual' | 'yearly';
+export type Recurrence =
+  | 'none'
+  | 'daily'
+  | 'weekly'
+  | 'biweekly'
+  | 'monthly'
+  | 'bimonthly'
+  | 'quarterly'
+  | 'four_monthly'
+  | 'semiannual'
+  | 'yearly'
+  | 'biennial'
+  | 'triennial'
+  | 'five_yearly'
+  | 'custom';
+
+/** L'unità di una ricorrenza personalizzata: «ogni 45 giorni». */
+export type RecurrenceUnit = 'days' | 'weeks' | 'months' | 'years';
+
+/** Come si chiamano le cadenze, in un posto solo. */
+export const RECURRENCE_LABELS: Record<Recurrence, string> = {
+  none: 'Nessuna',
+  daily: 'Giornaliera',
+  weekly: 'Settimanale',
+  biweekly: 'Ogni due settimane',
+  monthly: 'Mensile',
+  bimonthly: 'Bimestrale',
+  quarterly: 'Trimestrale',
+  four_monthly: 'Quadrimestrale',
+  semiannual: 'Semestrale',
+  yearly: 'Annuale',
+  biennial: 'Biennale',
+  triennial: 'Triennale',
+  five_yearly: 'Quinquennale',
+  custom: 'Personalizzata (ogni…)',
+};
+
+export const RECURRENCE_UNIT_LABELS: Record<RecurrenceUnit, string> = {
+  days: 'giorni',
+  weeks: 'settimane',
+  months: 'mesi',
+  years: 'anni',
+};
 export type NotificationStatus = 'pending' | 'sent' | 'failed' | 'cancelled';
 
 /** Etichette dei tipi, in un posto solo. */
@@ -35,6 +77,9 @@ export interface Reminder {
   recurrence: Recurrence;
   /** Fino a quando si ripete. Vuoto = ricorrenza aperta, senza fine. */
   recurrence_until: string | null;
+  /** Ogni quanto, con la ricorrenza personalizzata. Vuoti per le altre. */
+  recurrence_every: number | null;
+  recurrence_unit: RecurrenceUnit | null;
   /** Lega fra loro le occorrenze nate insieme. */
   series_id: string | null;
   /** Posizione nella serie, es. [3, 12]. Solo leggendo il singolo promemoria. */

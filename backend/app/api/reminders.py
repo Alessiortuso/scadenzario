@@ -7,7 +7,14 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from ..db import get_db, get_local_db
-from ..models import Notification, Recurrence, Reminder, ReminderKind, ReminderStatus
+from ..models import (
+    Notification,
+    Recurrence,
+    RecurrenceUnit,
+    Reminder,
+    ReminderKind,
+    ReminderStatus,
+)
 from ..schemas import (
     CalendarMonth,
     CalendarYear,
@@ -123,6 +130,8 @@ def occurrences(
     due_date: date,
     recurrence: Recurrence,
     recurrence_until: date | None = None,
+    recurrence_every: int | None = None,
+    recurrence_unit: RecurrenceUnit | None = None,
     amount: float | None = None,
 ) -> list[Occurrence]:
     """Le date in cui una ricorrenza si ripresenterà, prima di salvarla.
@@ -131,7 +140,9 @@ def occurrences(
     resta qui, dove sta già quello vero, invece di essere riscritto in
     JavaScript e divergere alla prima differenza sui mesi corti.
     """
-    date_serie = reminder_service.occurrence_dates(due_date, recurrence, recurrence_until)
+    date_serie = reminder_service.occurrence_dates(
+        due_date, recurrence, recurrence_until, recurrence_every, recurrence_unit
+    )
     return [Occurrence(due_date=quando, amount=amount) for quando in date_serie]
 
 
@@ -195,6 +206,11 @@ def update_reminder(
 ) -> Reminder:
     reminder = _get_or_404(db, reminder_id)
     data = payload.model_dump(exclude_unset=True)
+    # Cambiando cadenza, l'intervallo personalizzato di prima non vale più:
+    # lasciarlo scritto sotto un «annuale» racconterebbe due cose diverse.
+    if data.get("recurrence") is not None and data["recurrence"] != Recurrence.CUSTOM:
+        data["recurrence_every"] = None
+        data["recurrence_unit"] = None
     if "notify_emails" in data:
         data["notify_emails"] = [str(e) for e in (data["notify_emails"] or [])] or None
     for field, value in data.items():

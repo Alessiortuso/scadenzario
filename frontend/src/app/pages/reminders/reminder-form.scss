@@ -56,6 +56,19 @@
   font-weight: 600;
 }
 
+/* Quantità e unità sono una cosa sola: «ogni 45 giorni» si legge di seguito. */
+.intervallo {
+  display: flex;
+  gap: 0.5rem;
+}
+.intervallo input {
+  width: 6rem;
+}
+.intervallo select {
+  flex: 1;
+  min-width: 0;
+}
+
 .occorrenze .table-wrap {
   margin-top: 0.5rem;
   max-height: 320px;

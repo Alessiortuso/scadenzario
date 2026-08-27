@@ -2,9 +2,16 @@ from __future__ import annotations
 
 from datetime import date, datetime, time, timezone
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
-from .models import NotificationStatus, Recurrence, ReminderKind, ReminderStatus
+from .models import (
+    MAX_INTERVALLO,
+    NotificationStatus,
+    Recurrence,
+    RecurrenceUnit,
+    ReminderKind,
+    ReminderStatus,
+)
 
 
 class ORMModel(BaseModel):
@@ -35,6 +42,9 @@ class ReminderBase(BaseModel):
     #: Quando la ricorrenza ha una fine, le occorrenze esistono tutte da
     #: subito. Vuoto = ricorrenza aperta, che ne genera una alla volta.
     recurrence_until: date | None = None
+    #: Ogni quanto, per la ricorrenza personalizzata: «ogni 45 giorni».
+    recurrence_every: int | None = Field(default=None, ge=1, le=MAX_INTERVALLO)
+    recurrence_unit: RecurrenceUnit | None = None
     amount: float | None = None
     owner: str | None = None
     reference: str | None = None
@@ -53,6 +63,22 @@ class ReminderBase(BaseModel):
     def _empty_time_is_none(cls, v: object) -> object:
         # Un <input type="time"> svuotato manda una stringa vuota, non null.
         return None if v == "" else v
+
+    @model_validator(mode="after")
+    def _check_intervallo(self) -> "ReminderBase":
+        """Un intervallo personalizzato ha senso solo con la voce «ogni…».
+
+        Fuori da quella, quantità e unità restano vuote: altrimenti un
+        promemoria annuale con dentro «ogni 45 giorni» racconterebbe due cose
+        diverse a chi lo rilegge.
+        """
+        if self.recurrence == Recurrence.CUSTOM:
+            if self.recurrence_every is None or self.recurrence_unit is None:
+                raise ValueError("Una ricorrenza personalizzata vuole ogni quanto si ripete")
+        else:
+            self.recurrence_every = None
+            self.recurrence_unit = None
+        return self
 
 
 class Occurrence(BaseModel):
@@ -80,6 +106,8 @@ class ReminderUpdate(BaseModel):
     status: ReminderStatus | None = None
     recurrence: Recurrence | None = None
     recurrence_until: date | None = None
+    recurrence_every: int | None = Field(default=None, ge=1, le=MAX_INTERVALLO)
+    recurrence_unit: RecurrenceUnit | None = None
     amount: float | None = None
     owner: str | None = None
     reference: str | None = None

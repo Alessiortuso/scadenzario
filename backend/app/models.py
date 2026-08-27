@@ -45,11 +45,42 @@ class ReminderKind(str, enum.Enum):
 
 
 class Recurrence(str, enum.Enum):
+    """Ogni quanto un promemoria si ripresenta.
+
+    Le voci elencate coprono le cadenze che hanno un nome nell'uso comune —
+    quelle che si scelgono senza doverci pensare. `CUSTOM` copre tutto il
+    resto: con `recurrence_every` e `recurrence_unit` si ottiene qualsiasi
+    intervallo, «ogni 45 giorni» compreso.
+    """
+
     NONE = "none"
+    DAILY = "daily"
+    WEEKLY = "weekly"
+    BIWEEKLY = "biweekly"
     MONTHLY = "monthly"
+    BIMONTHLY = "bimonthly"
     QUARTERLY = "quarterly"
+    FOUR_MONTHLY = "four_monthly"
     SEMIANNUAL = "semiannual"
     YEARLY = "yearly"
+    BIENNIAL = "biennial"
+    TRIENNIAL = "triennial"
+    FIVE_YEARLY = "five_yearly"
+    CUSTOM = "custom"
+
+
+class RecurrenceUnit(str, enum.Enum):
+    """L'unità di misura di una ricorrenza personalizzata."""
+
+    DAYS = "days"
+    WEEKS = "weeks"
+    MONTHS = "months"
+    YEARS = "years"
+
+
+#: Il tetto all'intervallo personalizzato. Serve solo a fermare i numeri
+#: assurdi: «ogni 999 anni» non è una ricorrenza, è un errore di battitura.
+MAX_INTERVALLO = 999
 
 
 class NotificationStatus(str, enum.Enum):
@@ -86,6 +117,12 @@ class Reminder(Base):
     #: proprio importo. È l'unico modo per farsi dire in anticipo quanto si
     #: pagherà a marzo, e per vederle tutte sul calendario.
     recurrence_until: Mapped[date | None] = mapped_column(Date, default=None)
+    #: Ogni quante unità, per la ricorrenza personalizzata: «ogni 45 giorni»
+    #: sono 45 qui e `DAYS` sotto. Vuote per tutte le cadenze con un nome.
+    recurrence_every: Mapped[int | None] = mapped_column(Integer, default=None)
+    recurrence_unit: Mapped[RecurrenceUnit | None] = mapped_column(
+        Enum(RecurrenceUnit, native_enum=False, length=8), default=None
+    )
     #: Lega fra loro le occorrenze nate insieme, per poterle trattare come una
     #: cosa sola — sapere che questa è "la terza di dodici", cancellarle tutte.
     series_id: Mapped[str | None] = mapped_column(String(36), default=None, index=True)

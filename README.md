@@ -40,7 +40,7 @@ Due database con due ruoli distinti:
 - **Preavvisi configurabili** (es. 30, 15, 7, 3, 1, 0 giorni prima) a livello globale o per singolo promemoria
 - **Solleciti dopo la data** ogni N giorni, con tetto massimo
 - **Avviso di recupero**: un promemoria inserito quando è già passato (o già dentro la finestra di preavviso) genera comunque un avviso immediato
-- **Ricorrenze**: mensile, trimestrale, semestrale, annuale. Senza data di fine l'occorrenza successiva nasce alla chiusura di quella corrente; indicando **fino a quando**, le occorrenze vengono create tutte insieme e ognuna può avere il proprio importo — le rate di un finanziamento raramente sono uguali. Le occorrenze di una serie si eliminano anche tutte in un colpo
+- **Ricorrenze**: giornaliera, settimanale, ogni due settimane, mensile, bimestrale, trimestrale, quadrimestrale, semestrale, annuale, biennale, triennale, quinquennale, oppure **personalizzata** — «ogni 45 giorni», «ogni 18 mesi», qualsiasi intervallo fino a 999 giorni, settimane, mesi o anni. Senza data di fine l'occorrenza successiva nasce alla chiusura di quella corrente; indicando **fino a quando**, le occorrenze vengono create tutte insieme e ognuna può avere il proprio importo — le rate di un finanziamento raramente sono uguali. Le occorrenze di una serie si eliminano anche tutte in un colpo
 - **Canali di notifica** attivabili singolarmente: centro notifiche in-app, Web Push (desktop), email SMTP
 - **Segnalazione insistente**: un avviso ignorato per un promemoria imminente continua a farsi notare sulla barra delle applicazioni (lampeggio, bollino sul pulsante, bollino sull'icona nella tray) finché non si apre il promemoria o l'elenco. La soglia in giorni è impostabile, 0 la disattiva
 - **Importazione CSV/Excel** con riconoscimento automatico delle colonne, anteprima con validazione riga per riga e reimport idempotente (aggiorna, non duplica)
@@ -194,11 +194,11 @@ Per riesaminare una release già pubblicata, senza pubblicare niente:
 ```powershell
 cd frontend; npm install; npx ng build      # l'app carica il frontend compilato
 cd ..\desktop; npm install
-$env:SCADENZARIO_DEV = '1'; npm start
+$env:PROMEMORIA_DEV = '1'; npm start
 ```
 
 L'app avvia da sé il backend dal venv, apre la finestra, resta nella tray alla chiusura e mostra i toast di Windows.
-Per lavorare sul frontend con ricaricamento a caldo: avvia `npm start` nel frontend e aggiungi `$env:SCADENZARIO_UI = 'http://localhost:4300'`.
+Per lavorare sul frontend con ricaricamento a caldo: avvia `npm start` nel frontend e aggiungi `$env:PROMEMORIA_UI = 'http://localhost:4300'`.
 
 ## Avvio — frontend (solo sviluppo interfaccia)
 

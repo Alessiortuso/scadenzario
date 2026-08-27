@@ -75,15 +75,52 @@
         <label for="recurrence">Ricorrenza</label>
         <select id="recurrence" formControlName="recurrence">
           <option value="none">Nessuna</option>
-          <option value="monthly">Mensile</option>
-          <option value="quarterly">Trimestrale</option>
-          <option value="semiannual">Semestrale</option>
-          <option value="yearly">Annuale</option>
+          <optgroup label="Giorni e settimane">
+            <option value="daily">Giornaliera</option>
+            <option value="weekly">Settimanale</option>
+            <option value="biweekly">Ogni due settimane</option>
+          </optgroup>
+          <optgroup label="Mesi">
+            <option value="monthly">Mensile</option>
+            <option value="bimonthly">Bimestrale</option>
+            <option value="quarterly">Trimestrale</option>
+            <option value="four_monthly">Quadrimestrale</option>
+            <option value="semiannual">Semestrale</option>
+          </optgroup>
+          <optgroup label="Anni">
+            <option value="yearly">Annuale</option>
+            <option value="biennial">Biennale</option>
+            <option value="triennial">Triennale</option>
+            <option value="five_yearly">Quinquennale</option>
+          </optgroup>
+          <optgroup label="Su misura">
+            <option value="custom">Personalizzata (ogni…)</option>
+          </optgroup>
         </select>
         @if (!isRecurring()) {
           <span class="small muted">Si ripete a intervalli regolari.</span>
         }
       </div>
+
+      @if (isCustom()) {
+        <div class="field">
+          <label for="recurrence_every">Si ripete ogni</label>
+          <div class="intervallo">
+            <input id="recurrence_every" type="number" min="1" max="999" formControlName="recurrence_every" />
+            <select formControlName="recurrence_unit" aria-label="Unità dell'intervallo">
+              <option value="days">giorni</option>
+              <option value="weeks">settimane</option>
+              <option value="months">mesi</option>
+              <option value="years">anni</option>
+            </select>
+          </div>
+          @if (form.controls.recurrence_every.touched && form.controls.recurrence_every.invalid) {
+            <span class="error-text">Indica ogni quanto si ripete (da 1 a 999).</span>
+          } @else {
+            <span class="small muted">Qualsiasi cadenza che non ha un nome: ogni 45 giorni, ogni 18 mesi…</span>
+          }
+        </div>
+      }
 
       @if (isRecurring()) {
         <div class="field">

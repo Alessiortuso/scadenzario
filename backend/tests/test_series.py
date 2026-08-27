@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from app.models import Recurrence
+from app.models import Recurrence, RecurrenceUnit
 from app.services import reminders as reminder_service
 
 
@@ -252,3 +252,65 @@ def test_il_calendario_annuale_manda_solo_i_giorni_pieni(client, make_reminder):
     anno = client.get("/api/reminders/calendar/year", params={"year": date.today().year}).json()
 
     assert len(anno["days"]) == 1
+
+
+def test_una_serie_su_misura_riempie_le_date_fino_alla_fine():
+    """«Ogni 45 giorni» non ha un nome, ma è una serie come le altre."""
+    date_serie = reminder_service.occurrence_dates(
+        date(2026, 1, 1), Recurrence.CUSTOM, date(2026, 5, 1), 45, RecurrenceUnit.DAYS
+    )
+
+    assert date_serie == [
+        date(2026, 1, 1),
+        date(2026, 2, 15),
+        date(2026, 4, 1),
+    ]
+
+
+def test_l_api_crea_una_serie_su_misura(client):
+    risposta = client.post(
+        "/api/reminders",
+        json={
+            "title": "Manutenzione impianto",
+            "due_date": "2026-01-01",
+            "recurrence": "custom",
+            "recurrence_every": 45,
+            "recurrence_unit": "days",
+            "recurrence_until": "2026-05-01",
+        },
+    )
+
+    assert risposta.status_code == 201
+    creato = risposta.json()
+    assert creato["recurrence_every"] == 45
+    assert creato["recurrence_unit"] == "days"
+    # Tre occorrenze: 1 gennaio, 15 febbraio, 1 aprile.
+    letto = client.get(f"/api/reminders/{creato['id']}").json()
+    assert letto["series_position"] == [1, 3]
+
+
+def test_l_api_rifiuta_un_su_misura_senza_intervallo(client):
+    """Senza «ogni quanto» la ricorrenza personalizzata non vuol dire nulla."""
+    risposta = client.post(
+        "/api/reminders",
+        json={"title": "Boh", "due_date": "2026-01-01", "recurrence": "custom"},
+    )
+
+    assert risposta.status_code == 422
+
+
+def test_una_cadenza_con_un_nome_non_si_porta_dietro_un_intervallo(client):
+    risposta = client.post(
+        "/api/reminders",
+        json={
+            "title": "Revisione biennale",
+            "due_date": "2026-01-01",
+            "recurrence": "biennial",
+            "recurrence_every": 45,
+            "recurrence_unit": "days",
+        },
+    )
+
+    assert risposta.status_code == 201
+    assert risposta.json()["recurrence_every"] is None
+    assert risposta.json()["recurrence_unit"] is None

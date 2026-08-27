@@ -7,7 +7,7 @@ import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../core/api.service';
 import { AttentionService } from '../../core/attention.service';
 import { describeError } from '../../core/describe-error';
-import { AppNotification, Occurrence, Reminder, ReminderKind } from '../../core/models';
+import { AppNotification, Occurrence, RecurrenceUnit, Reminder, ReminderKind } from '../../core/models';
 import { NotificationStore } from '../../core/notification.store';
 import { ToastService } from '../../core/toast.service';
 import { KindIcon } from '../../shared/kind-icon';
@@ -44,6 +44,8 @@ export class ReminderFormPage implements OnInit {
     start_time: [''],
     recurrence: ['none'],
     recurrence_until: [''],
+    recurrence_every: this.fb.control<number | null>(null),
+    recurrence_unit: ['months'],
     amount: this.fb.control<number | null>(null),
     owner: [''],
     reference: [''],
@@ -65,6 +67,8 @@ export class ReminderFormPage implements OnInit {
   /** Ricorrenza scelta ora, per far comparire i campi che la riguardano. */
   readonly recurrence = signal<Reminder['recurrence']>('none');
   readonly isRecurring = computed(() => this.recurrence() !== 'none');
+  /** La cadenza «ogni…»: è l'unica che chiede quantità e unità. */
+  readonly isCustom = computed(() => this.recurrence() === 'custom');
 
   /** Le occorrenze della serie, con l'importo modificabile una per una. */
   readonly occurrences = signal<Occurrence[]>([]);
@@ -77,6 +81,19 @@ export class ReminderFormPage implements OnInit {
   async ngOnInit(): Promise<void> {
     this.form.controls.recurrence.valueChanges.subscribe((r) => {
       this.recurrence.set(r as Reminder['recurrence']);
+      // L'intervallo è obbligatorio solo per «ogni…»: lasciarlo richiesto
+      // altrove bloccherebbe il salvataggio di una banale annuale.
+      const ogni = this.form.controls.recurrence_every;
+      if (r === 'custom') {
+        ogni.setValidators([Validators.required, Validators.min(1), Validators.max(999)]);
+        if (ogni.value === null) {
+          ogni.setValue(1, { emitEvent: false });
+        }
+      } else {
+        ogni.clearValidators();
+      }
+      ogni.updateValueAndValidity({ emitEvent: false });
+
       if (r === 'none') {
         this.form.controls.recurrence_until.setValue('');
         this.occurrences.set([]);
@@ -87,6 +104,8 @@ export class ReminderFormPage implements OnInit {
 
     // Le occorrenze dipendono anche da data e importo di partenza.
     this.form.controls.recurrence_until.valueChanges.subscribe(() => void this.aggiornaOccorrenze());
+    this.form.controls.recurrence_every.valueChanges.subscribe(() => void this.aggiornaOccorrenze());
+    this.form.controls.recurrence_unit.valueChanges.subscribe(() => void this.aggiornaOccorrenze());
     this.form.controls.due_date.valueChanges.subscribe(() => void this.aggiornaOccorrenze());
 
     this.form.controls.kind.valueChanges.subscribe((k) => {
@@ -114,6 +133,8 @@ export class ReminderFormPage implements OnInit {
           start_time: reminder.start_time ? reminder.start_time.slice(0, 5) : '',
           recurrence: reminder.recurrence,
           recurrence_until: reminder.recurrence_until ?? '',
+          recurrence_every: reminder.recurrence_every,
+          recurrence_unit: reminder.recurrence_unit ?? 'months',
           amount: reminder.amount,
           owner: reminder.owner ?? '',
           reference: reminder.reference ?? '',
@@ -149,8 +170,17 @@ export class ReminderFormPage implements OnInit {
    *
    * Gli importi già digitati si conservano: cambiare la data di fine per
    * aggiungere una rata non deve cancellare le cifre inserite a mano.
+   *
+   * In modifica non si calcola niente: le occorrenze esistono già, ognuna come
+   * promemoria a sé con il suo importo, e ricomparire qui con le caselle vuote
+   * faceva sembrare che gli importi si fossero persi.
    */
   private async aggiornaOccorrenze(): Promise<void> {
+    if (this.isEdit()) {
+      this.occurrences.set([]);
+      return;
+    }
+
     const raw = this.form.getRawValue();
     if (raw.recurrence === 'none' || !raw.recurrence_until || !raw.due_date) {
       this.occurrences.set([]);
@@ -165,6 +195,7 @@ export class ReminderFormPage implements OnInit {
           due_date: raw.due_date,
           recurrence: raw.recurrence as Reminder['recurrence'],
           recurrence_until: raw.recurrence_until,
+          ...this.intervallo(),
           amount: raw.amount === null || String(raw.amount) === '' ? null : Number(raw.amount),
         }),
       );
@@ -176,6 +207,23 @@ export class ReminderFormPage implements OnInit {
     } finally {
       this.loadingOccurrences.set(false);
     }
+  }
+
+  /** Quantità e unità dell'intervallo, vuote fuori dalla cadenza «ogni…».
+   *
+   * Si mandano sempre entrambe: passando da «ogni 45 giorni» ad «annuale» il
+   * server deve vederle svuotate, non trovarsele addosso al prossimo salvataggio.
+   */
+  private intervallo(): Pick<Reminder, 'recurrence_every' | 'recurrence_unit'> {
+    const raw = this.form.getRawValue();
+    if (raw.recurrence !== 'custom') {
+      return { recurrence_every: null, recurrence_unit: null };
+    }
+    const ogni = Number(raw.recurrence_every);
+    return {
+      recurrence_every: Number.isFinite(ogni) && ogni >= 1 ? Math.trunc(ogni) : 1,
+      recurrence_unit: raw.recurrence_unit as RecurrenceUnit,
+    };
   }
 
   /** Importo di una singola occorrenza, digitato nella tabella. */
@@ -209,6 +257,7 @@ export class ReminderFormPage implements OnInit {
       start_time: raw.start_time || null,
       recurrence: raw.recurrence as Reminder['recurrence'],
       recurrence_until: raw.recurrence_until || null,
+      ...this.intervallo(),
       amount: raw.amount === null || String(raw.amount) === '' ? null : Number(raw.amount),
       owner: raw.owner.trim() || null,
       reference: raw.reference.trim() || null,

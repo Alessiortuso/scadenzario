@@ -7,7 +7,7 @@ from datetime import date
 from dateutil.relativedelta import relativedelta
 from sqlalchemy import select
 
-from app.models import Reminder, ReminderStatus, Notification, Recurrence
+from app.models import Reminder, ReminderStatus, Notification, Recurrence, RecurrenceUnit
 from app.services import reminders as reminder_service
 
 
@@ -18,6 +18,57 @@ def test_passo_delle_ricorrenze():
     assert reminder_service.next_due_date(date(2026, 3, 15), Recurrence.SEMIANNUAL) == date(2026, 9, 15)
     assert reminder_service.next_due_date(date(2026, 3, 15), Recurrence.YEARLY) == date(2027, 3, 15)
     assert reminder_service.next_due_date(date(2026, 3, 15), Recurrence.NONE) is None
+
+
+def test_le_cadenze_con_un_nome_hanno_tutte_il_loro_passo():
+    """Quadrimestrale, biennale e quinquennale sono cadenze reali: l'IVA di
+    certi regimi, le revisioni, le certificazioni."""
+    partenza = date(2026, 3, 15)
+    assert reminder_service.next_due_date(partenza, Recurrence.DAILY) == date(2026, 3, 16)
+    assert reminder_service.next_due_date(partenza, Recurrence.WEEKLY) == date(2026, 3, 22)
+    assert reminder_service.next_due_date(partenza, Recurrence.BIWEEKLY) == date(2026, 3, 29)
+    assert reminder_service.next_due_date(partenza, Recurrence.BIMONTHLY) == date(2026, 5, 15)
+    assert reminder_service.next_due_date(partenza, Recurrence.FOUR_MONTHLY) == date(2026, 7, 15)
+    assert reminder_service.next_due_date(partenza, Recurrence.BIENNIAL) == date(2028, 3, 15)
+    assert reminder_service.next_due_date(partenza, Recurrence.TRIENNIAL) == date(2029, 3, 15)
+    assert reminder_service.next_due_date(partenza, Recurrence.FIVE_YEARLY) == date(2031, 3, 15)
+
+
+def test_la_ricorrenza_personalizzata_conta_a_modo_suo():
+    partenza = date(2026, 3, 15)
+    assert (
+        reminder_service.next_due_date(partenza, Recurrence.CUSTOM, 45, RecurrenceUnit.DAYS)
+        == date(2026, 4, 29)
+    )
+    assert (
+        reminder_service.next_due_date(partenza, Recurrence.CUSTOM, 18, RecurrenceUnit.MONTHS)
+        == date(2027, 9, 15)
+    )
+
+
+def test_un_intervallo_a_meta_non_e_una_ricorrenza():
+    """Un campo lasciato in bianco non deve far nascere occorrenze a caso."""
+    partenza = date(2026, 3, 15)
+    assert reminder_service.next_due_date(partenza, Recurrence.CUSTOM) is None
+    assert reminder_service.next_due_date(partenza, Recurrence.CUSTOM, 0, RecurrenceUnit.DAYS) is None
+
+
+def test_chiudere_una_ricorrenza_personalizzata_ne_riporta_l_intervallo(
+    shared_db, local_db, make_reminder
+):
+    """L'occorrenza successiva deve sapersi ripetere come la precedente."""
+    reminder = make_reminder(3)
+    reminder.recurrence = Recurrence.CUSTOM
+    reminder.recurrence_every = 45
+    reminder.recurrence_unit = RecurrenceUnit.DAYS
+    shared_db.commit()
+
+    _, successiva = reminder_service.complete(shared_db, local_db, reminder)
+
+    assert successiva is not None
+    assert successiva.due_date == reminder.due_date + relativedelta(days=45)
+    assert successiva.recurrence_every == 45
+    assert successiva.recurrence_unit == RecurrenceUnit.DAYS
 
 
 def test_chiudere_un_promemoria_non_ricorrente_non_ne_crea_altri(shared_db, local_db, make_reminder):

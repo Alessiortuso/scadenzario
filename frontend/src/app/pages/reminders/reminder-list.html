@@ -75,7 +75,7 @@
                 <span class="kind" [title]="kindLabels[r.kind]"><app-kind-icon [kind]="r.kind" /></span>
                 <a [routerLink]="['/promemoria', r.id]">{{ r.title }}</a>
                 @if (r.recurrence !== 'none') {
-                  <span class="badge badge-neutral">ricorrente</span>
+                  <span class="badge badge-neutral" [title]="'Ricorrenza ' + ricorrenza(r)">{{ ricorrenza(r) }}</span>
                 }
                 @if (r.source !== 'manual') {
                   <span class="badge badge-neutral">{{ r.source }}</span>

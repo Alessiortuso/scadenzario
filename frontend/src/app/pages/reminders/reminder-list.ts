@@ -6,7 +6,14 @@ import { firstValueFrom } from 'rxjs';
 
 import { ApiService } from '../../core/api.service';
 import { AttentionService } from '../../core/attention.service';
-import { KIND_LABELS, Reminder, ReminderKind, ReminderQuery, ReminderStatus } from '../../core/models';
+import {
+  KIND_LABELS,
+  RECURRENCE_LABELS,
+  Reminder,
+  ReminderKind,
+  ReminderQuery,
+  ReminderStatus,
+} from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { DueBadge } from '../../shared/due-badge';
 import { KindIcon } from '../../shared/kind-icon';
@@ -27,6 +34,15 @@ export class ReminderListPage implements OnInit {
   private readonly attention = inject(AttentionService);
 
   readonly kindLabels = KIND_LABELS;
+
+  /** Come si chiama la cadenza di un promemoria ricorrente. */
+  ricorrenza(reminder: Reminder): string {
+    if (reminder.recurrence === 'custom' && reminder.recurrence_every && reminder.recurrence_unit) {
+      const unita = { days: 'giorni', weeks: 'settimane', months: 'mesi', years: 'anni' };
+      return `ogni ${reminder.recurrence_every} ${unita[reminder.recurrence_unit]}`;
+    }
+    return RECURRENCE_LABELS[reminder.recurrence].toLowerCase();
+  }
 
   readonly items = signal<Reminder[]>([]);
   readonly total = signal(0);

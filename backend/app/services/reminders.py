@@ -8,34 +8,77 @@ from dateutil.relativedelta import relativedelta
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from ..models import Recurrence, Reminder, ReminderKind, ReminderStatus
+from ..models import (
+    MAX_INTERVALLO,
+    Recurrence,
+    RecurrenceUnit,
+    Reminder,
+    ReminderKind,
+    ReminderStatus,
+)
 from ..schemas import CalendarDay, CalendarMonth, CalendarYear, KindStat, ReminderStats, YearDay
 from . import alerts, settings_service
 
 _RECURRENCE_STEP = {
+    Recurrence.DAILY: relativedelta(days=1),
+    Recurrence.WEEKLY: relativedelta(weeks=1),
+    Recurrence.BIWEEKLY: relativedelta(weeks=2),
     Recurrence.MONTHLY: relativedelta(months=1),
+    Recurrence.BIMONTHLY: relativedelta(months=2),
     Recurrence.QUARTERLY: relativedelta(months=3),
+    Recurrence.FOUR_MONTHLY: relativedelta(months=4),
     Recurrence.SEMIANNUAL: relativedelta(months=6),
     Recurrence.YEARLY: relativedelta(years=1),
+    Recurrence.BIENNIAL: relativedelta(years=2),
+    Recurrence.TRIENNIAL: relativedelta(years=3),
+    Recurrence.FIVE_YEARLY: relativedelta(years=5),
 }
 
 #: La griglia del calendario comincia di lunedì, come ogni calendario italiano.
 _CALENDAR = Calendar(firstweekday=0)
 
-#: Quante occorrenze si accetta di creare in un colpo solo. Con la ricorrenza
-#: più fitta (mensile) sono dieci anni: oltre, quasi certamente è una data di
-#: fine sbagliata, e crearne migliaia riempirebbe il calendario di spazzatura
-#: difficile da togliere.
-MAX_OCCORRENZE = 120
+#: Quante occorrenze si accetta di creare in un colpo solo. Sono più di trent'anni
+#: di rate mensili, e più di un anno della ricorrenza più fitta (giornaliera):
+#: oltre, quasi certamente è una data di fine sbagliata, e crearne migliaia
+#: riempirebbe il calendario di spazzatura difficile da togliere.
+MAX_OCCORRENZE = 400
 
 
-def next_due_date(current: date, recurrence: Recurrence) -> date | None:
-    step = _RECURRENCE_STEP.get(recurrence)
+def recurrence_step(
+    recurrence: Recurrence,
+    every: int | None = None,
+    unit: RecurrenceUnit | None = None,
+) -> relativedelta | None:
+    """Di quanto ci si sposta a ogni ripetizione, o `None` se non si ripete.
+
+    Le cadenze con un nome hanno il passo scritto in tabella; quella
+    personalizzata se lo costruisce da quantità e unità. Un intervallo
+    incompleto o fuori scala vale come nessuna ricorrenza, invece di far
+    saltare il salvataggio a chi ha lasciato il campo a metà.
+    """
+    if recurrence == Recurrence.CUSTOM:
+        if every is None or unit is None or not 1 <= int(every) <= MAX_INTERVALLO:
+            return None
+        return relativedelta(**{RecurrenceUnit(unit).value: int(every)})
+    return _RECURRENCE_STEP.get(recurrence)
+
+
+def next_due_date(
+    current: date,
+    recurrence: Recurrence,
+    every: int | None = None,
+    unit: RecurrenceUnit | None = None,
+) -> date | None:
+    step = recurrence_step(recurrence, every, unit)
     return current + step if step else None
 
 
 def occurrence_dates(
-    start: date, recurrence: Recurrence, until: date | None
+    start: date,
+    recurrence: Recurrence,
+    until: date | None,
+    every: int | None = None,
+    unit: RecurrenceUnit | None = None,
 ) -> list[date]:
     """Le date in cui un promemoria ricorrente si ripresenta, fino a `until`.
 
@@ -46,7 +89,7 @@ def occurrence_dates(
     ricorrenza aperta continua a generare un'occorrenza per volta alla
     chiusura, com'è sempre stato.
     """
-    passo = _RECURRENCE_STEP.get(recurrence)
+    passo = recurrence_step(recurrence, every, unit)
     if passo is None or until is None or until < start:
         return [start]
 
@@ -80,7 +123,11 @@ def create_series(
     from . import alerts, settings_service
 
     date_serie = occurrence_dates(
-        dati["due_date"], dati.get("recurrence") or Recurrence.NONE, dati.get("recurrence_until")
+        dati["due_date"],
+        dati.get("recurrence") or Recurrence.NONE,
+        dati.get("recurrence_until"),
+        dati.get("recurrence_every"),
+        dati.get("recurrence_unit"),
     )
     serie = str(uuid.uuid4()) if len(date_serie) > 1 else None
 
@@ -143,7 +190,16 @@ def complete(db: Session, local_db: Session, reminder: Reminder) -> tuple[Remind
     # Le occorrenze di una serie con una fine esistono già tutte: generarne
     # un'altra alla chiusura significherebbe sdoppiare l'ultima rata.
     nxt: Reminder | None = None
-    next_date = None if reminder.series_id else next_due_date(reminder.due_date, reminder.recurrence)
+    next_date = (
+        None
+        if reminder.series_id
+        else next_due_date(
+            reminder.due_date,
+            reminder.recurrence,
+            reminder.recurrence_every,
+            reminder.recurrence_unit,
+        )
+    )
     if next_date is not None:
         nxt = Reminder(
             title=reminder.title,
@@ -152,6 +208,8 @@ def complete(db: Session, local_db: Session, reminder: Reminder) -> tuple[Remind
             start_time=reminder.start_time,
             kind=reminder.kind,
             recurrence=reminder.recurrence,
+            recurrence_every=reminder.recurrence_every,
+            recurrence_unit=reminder.recurrence_unit,
             amount=reminder.amount,
             owner=reminder.owner,
             reference=reminder.reference,
