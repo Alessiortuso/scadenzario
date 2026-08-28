@@ -98,6 +98,20 @@ Lo schema è gestito con **Alembic** e si aggiorna da sé: a ogni avvio il backe
 
 I due database hanno storie separate — tabelle di versione distinte, `alembic_version` e `alembic_version_local` — perché uno è condiviso da tutti e l'altro appartiene alla singola postazione.
 
+### Quando una postazione resta indietro
+
+Le postazioni non si aggiornano tutte nello stesso istante. La prima che lo fa applica la migrazione al database condiviso, e da quel momento chi è rimasto alla versione precedente trova nel database una revisione che non conosce: non si collega più, e la schermata di configurazione prende il posto dell'applicazione. È voluto — lavorare su uno schema che il codice non si aspetta farebbe danni peggiori — ma **non deve richiedere che qualcuno vada a scaricare l'installer a mano**.
+
+Tre meccanismi lo evitano, dal più visibile al più silenzioso:
+
+- **Il pulsante «Aggiorna adesso»**, sulla schermata di configurazione, compare *solo* per questo guasto: `SchemaPiuRecente` porta il codice `schema_piu_recente`, che arriva all'interfaccia in `last_error_code`. Scarica e riavvia sul posto, mostrando la percentuale. Con un database irraggiungibile o una password sbagliata il pulsante non compare, perché aggiornare non servirebbe.
+- **L'installazione a finestra nascosta**: un aggiornamento già scaricato non aspetta più una chiusura che su un'app che vive nella tray non arriva mai. Dopo dieci minuti di finestra nascosta si applica da sé — un minuto solo, se la postazione è già bloccata, dove non c'è nessun lavoro da interrompere.
+- **Il controllo ogni ora** invece che ogni giorno, e subito all'avvio: quando l'utente arriva sulla schermata, il pacchetto è spesso già pronto e il pulsante riavvia e basta.
+
+`/api/health` espone `schema_ahead` perché il processo Electron possa saperlo: l'interfaccia non la legge, e quella rotta la interroga già all'avvio.
+
+Resta un limite che nessuna versione futura può togliere: **il comportamento di una postazione bloccata lo decide il codice già installato lì**. Una postazione ferma a una versione precedente a questa manutenzione va aggiornata a mano quell'ultima volta.
+
 Le installazioni nate prima delle migrazioni (la 1.0.0, che creava le tabelle con `create_all`) non vengono ricreate: al primo avvio lo schema esistente viene *marcato* alla revisione iniziale, e da lì in poi segue le migrazioni normalmente.
 
 ### Aggiornamento alla 1.1.0 — da Scadenzario a Promemoria
@@ -108,7 +122,7 @@ La migrazione `0003` **elimina categoria e priorità**, per snellire una scherma
 
 Due conseguenze operative, entrambe volute:
 
-- **L'aggiornamento va fatto su tutte le postazioni.** Una postazione ferma alla 1.0.x non riconosce più lo schema del database condiviso e smette di funzionare finché non aggiorna. Gli aggiornamenti sono automatici, ma un PC rimasto spento a lungo va acceso e lasciato aggiornare prima dell'uso.
+- **L'aggiornamento va fatto su tutte le postazioni.** Una postazione ferma alla 1.0.x non riconosce più lo schema del database condiviso e smette di funzionare finché non aggiorna. Gli aggiornamenti sono automatici e una postazione bloccata si sblocca da sé (vedi *Quando una postazione resta indietro*), ma un PC rimasto spento a lungo va acceso e lasciato aggiornare prima dell'uso.
 - **La cartella dati cambia nome**, da `%LOCALAPPDATA%\Scadenzario` a `%LOCALAPPDATA%\Promemoria`. Lo spostamento è automatico e porta con sé `config.json` e il database locale degli avvisi, così non va rifatta la configurazione. Se la cartella risulta occupata si continua a usare la vecchia e si riprova al riavvio successivo.
 
 Restano invariati di proposito, perché cambiarli farebbe danni senza portare vantaggi: l'`appId` di electron-builder (`it.scadenzario.desktop`) — cambiarlo installerebbe la 1.1.0 **accanto** alla vecchia invece che al suo posto — il repository GitHub degli aggiornamenti e il nome del progetto Neon. Sono identificatori interni che nessun utente legge. Restano validi anche i collegamenti `scadenzario://` dei toast già mostrati, e le vecchie rotte `/scadenze/...` rimandano alle nuove.

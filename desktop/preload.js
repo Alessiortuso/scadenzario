@@ -22,4 +22,22 @@ contextBridge.exposeInMainWorld('promemoria', {
     // si perderebbe; qui si segnala che da adesso c'è chi lo raccoglie.
     ipcRenderer.send('interfaccia-pronta');
   },
+
+  /**
+   * Aggiornamento comandato dall'interfaccia.
+   *
+   * Serve alla schermata di configurazione: quando una postazione resta
+   * indietro rispetto al database condiviso, il rimedio è aggiornare — e
+   * chiederlo lì, dov'è il problema, evita il giro su GitHub a scaricare
+   * l'installer a mano.
+   */
+  aggiornamento: {
+    stato: () => ipcRenderer.invoke('aggiornamento-stato'),
+    avvia: () => ipcRenderer.invoke('aggiornamento-avvia'),
+    onStato: (callback) => {
+      const ascoltatore = (_event, stato) => callback(stato);
+      ipcRenderer.on('aggiornamento-stato', ascoltatore);
+      return () => ipcRenderer.removeListener('aggiornamento-stato', ascoltatore);
+    },
+  },
 });

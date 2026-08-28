@@ -57,6 +57,14 @@ class SchemaPiuRecente(RuntimeError):
     suggerisce a nessuno la cosa da fare — cioè aggiornare l'applicazione.
     """
 
+    #: Codice stabile, per chi deve *decidere* e non solo scrivere.
+    #:
+    #: È l'unico guasto del collegamento che la postazione sa riparare da sé:
+    #: riconoscendolo, la schermata di configurazione offre il pulsante che
+    #: scarica e applica l'aggiornamento, invece di rimandare a GitHub. Il testo
+    #: del messaggio non serve allo scopo — cambia, si traduce, si riformula.
+    codice = "schema_piu_recente"
+
 
 def _script_location() -> Path:
     """Dove stanno le migrazioni, in sviluppo e dentro l'eseguibile."""

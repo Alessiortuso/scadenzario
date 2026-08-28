@@ -71,13 +71,23 @@ async def _not_configured_handler(request: Request, exc: NotConfigured) -> JSONR
 
 @app.get("/api/health", tags=["sistema"])
 def health() -> dict:
+    from . import db as db_module
     from .db import is_shared_configured
+    from .migrations import SchemaPiuRecente
 
     return {
         "status": "ok",
         "timezone": settings.timezone,
         "device": runtime_config.device_name(),
         "database_configured": is_shared_configured(),
+        # Questa postazione è rimasta indietro: il database condiviso è già
+        # stato migrato da una versione più recente. Sta qui, e non solo in
+        # `/api/setup/status`, perché il primo che deve saperlo è Electron —
+        # che l'interfaccia non la legge, e all'avvio interroga già questa
+        # rotta. Sapendolo, cerca l'aggiornamento subito invece di aspettare
+        # il giro dell'ora, così il pulsante «Aggiorna adesso» trova il
+        # pacchetto già pronto quando l'utente ci arriva.
+        "schema_ahead": db_module.shared_error_code == SchemaPiuRecente.codice,
         "push_configured": settings.push_enabled,
         "email_configured": settings.email_enabled,
     }

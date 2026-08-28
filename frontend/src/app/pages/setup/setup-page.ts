@@ -1,8 +1,9 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
+import { AggiornamentoService } from '../../core/aggiornamento.service';
 import { ApiService } from '../../core/api.service';
 import { ConnectionTestResult, SetupStatus } from '../../core/models';
 import { SetupService } from '../../core/setup.service';
@@ -14,11 +15,12 @@ import { ToastService } from '../../core/toast.service';
   templateUrl: './setup-page.html',
   styleUrl: './setup-page.scss',
 })
-export class SetupPage implements OnInit {
+export class SetupPage implements OnInit, OnDestroy {
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
   private readonly toasts = inject(ToastService);
   private readonly setup = inject(SetupService);
+  readonly aggiornamento = inject(AggiornamentoService);
 
   readonly status = signal<SetupStatus | null>(null);
   readonly databaseUrl = signal('');
@@ -30,6 +32,21 @@ export class SetupPage implements OnInit {
 
   readonly canSubmit = computed(() => this.databaseUrl().trim().length > 20 && !this.saving());
 
+  /**
+   * La postazione è solo rimasta indietro: la configurazione è buona e basta
+   * aggiornare. È l'unico guasto per cui offrire il pulsante ha senso — con un
+   * database irraggiungibile o una password sbagliata l'aggiornamento non
+   * cambierebbe niente, e il pulsante manderebbe fuori strada.
+   */
+  readonly daAggiornare = computed(
+    () => this.status()?.last_error_code === 'schema_piu_recente',
+  );
+
+  /** Il pulsante è in mezzo a un'operazione e non va premuto di nuovo. */
+  readonly aggiornamentoInCorso = computed(() =>
+    ['controllo', 'scaricamento', 'riavvio'].includes(this.aggiornamento.stato().fase),
+  );
+
   async ngOnInit(): Promise<void> {
     const status = await this.setup.refresh();
     this.status.set(status);
@@ -37,6 +54,16 @@ export class SetupPage implements OnInit {
       this.deviceName.set(status.device_name);
       this.emailSender.set(status.email_sender_device);
     }
+    if (this.daAggiornare()) await this.aggiornamento.collega();
+  }
+
+  ngOnDestroy(): void {
+    this.aggiornamento.scollega();
+  }
+
+  /** Scarica e applica l'aggiornamento, senza passare da GitHub. */
+  async aggiorna(): Promise<void> {
+    await this.aggiornamento.avvia();
   }
 
   async test(): Promise<void> {

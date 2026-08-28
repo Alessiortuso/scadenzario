@@ -250,6 +250,12 @@ export interface SetupStatus {
   email_sender_device: boolean;
   /** Perché la postazione non è collegata, quando una configurazione c'è già. */
   last_error: string | null;
+  /**
+   * Lo stesso guasto in forma confrontabile. `schema_piu_recente` significa
+   * che la stringa di connessione è giusta e manca solo l'aggiornamento:
+   * l'unico caso che la postazione sa risolvere da sé.
+   */
+  last_error_code: string | null;
 }
 
 export interface ConnectionTestResult {

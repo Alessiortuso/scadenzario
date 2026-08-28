@@ -48,6 +48,23 @@ header p {
   color: var(--danger);
 }
 
+.aggiorna {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.9rem;
+}
+// Il pulsante cambia testo mentre lavora («Aggiorna adesso» → «Scaricamento
+// 43%»): senza una larghezza minima il riquadro si allarga e si stringe a ogni
+// punto percentuale, e il resto della riga balla.
+.aggiorna .btn {
+  min-width: 12rem;
+}
+.aggiorna span {
+  flex: 1 1 16rem;
+}
+
 .grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;

@@ -10,12 +10,63 @@
 
   @if (status()?.last_error; as errore) {
     <div class="card guasto">
-      <strong>Questa postazione ha già una configurazione, ma il collegamento non è riuscito.</strong>
-      <p class="small">{{ errore }}</p>
-      <p class="small muted">
-        Se il messaggio parla di una revisione sconosciuta, la stringa di connessione è giusta e non va riscritta:
-        serve aggiornare Promemoria su questo computer.
-      </p>
+      @if (daAggiornare()) {
+        <strong>Promemoria va aggiornato su questo computer.</strong>
+        <p class="small">{{ errore }}</p>
+        <p class="small muted">
+          È successo perché un'altra postazione si è aggiornata prima di questa. La stringa di connessione qui sotto è
+          giusta e non va riscritta: basta scaricare la versione nuova.
+        </p>
+
+        @if (aggiornamento.stato().fase !== 'non-disponibile') {
+          <div class="aggiorna">
+            <button class="btn btn-primary" type="button" [disabled]="aggiornamentoInCorso()" (click)="aggiorna()">
+              @switch (aggiornamento.stato().fase) {
+                @case ('controllo') { Controllo in corso… }
+                @case ('scaricamento') { Scaricamento {{ aggiornamento.stato().percento ?? 0 }}% }
+                @case ('pronto') { Riavvia e applica }
+                @case ('riavvio') { Riavvio in corso… }
+                @default { Aggiorna adesso }
+              }
+            </button>
+
+            @switch (aggiornamento.stato().fase) {
+              @case ('scaricamento') {
+                <span class="small muted">
+                  L'applicazione si riavvierà da sé quando il pacchetto è pronto. Puoi lasciare la finestra aperta.
+                </span>
+              }
+              @case ('pronto') {
+                <span class="small muted">
+                  Versione {{ aggiornamento.stato().versione }} scaricata: il riavvio dura pochi secondi.
+                </span>
+              }
+              @case ('nessuno') {
+                <span class="small muted">
+                  Nessun aggiornamento disponibile: la postazione che ha migrato il database sta usando una versione
+                  non ancora pubblicata. Riprova fra qualche minuto.
+                </span>
+              }
+              @case ('errore') {
+                <span class="small muted">
+                  Aggiornamento non riuscito: {{ aggiornamento.stato().dettaglio }}
+                </span>
+              }
+              @default {
+                <span class="small muted">
+                  Scarica e installa la versione più recente, senza uscire dall'applicazione.
+                </span>
+              }
+            }
+          </div>
+        }
+      } @else {
+        <strong>Questa postazione ha già una configurazione, ma il collegamento non è riuscito.</strong>
+        <p class="small">{{ errore }}</p>
+        <p class="small muted">
+          Controlla che la stringa di connessione sia ancora valida e che il computer raggiunga internet.
+        </p>
+      }
     </div>
   }
 

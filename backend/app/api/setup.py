@@ -24,6 +24,10 @@ class SetupStatus(BaseModel):
     #: mostra in cima alla schermata, così l'utente sa se il rimedio è
     #: riscrivere la stringa o aggiornare l'applicazione.
     last_error: str | None = None
+    #: Lo stesso guasto in forma confrontabile. Vale `schema_piu_recente`
+    #: quando la postazione è semplicemente indietro di una versione: è il caso
+    #: in cui la schermata mostra il pulsante che aggiorna sul posto.
+    last_error_code: str | None = None
 
 
 class ConnectionTest(BaseModel):
@@ -79,6 +83,7 @@ def status() -> SetupStatus:
         device_name=runtime_config.device_name(),
         email_sender_device=runtime_config.email_sender_device(),
         last_error=None if is_shared_configured() else db_module.shared_error,
+        last_error_code=None if is_shared_configured() else db_module.shared_error_code,
     )
 
 

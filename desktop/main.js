@@ -34,6 +34,9 @@ const PROTOCOL = app.isPackaged ? 'promemoria' : 'promemoria-sviluppo';
 const PORT = Number(process.env.PROMEMORIA_PORT || 8010);
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 const POLL_MS = 30_000;
+//: Quanto la finestra deve restare nascosta prima che un aggiornamento già
+//: scaricato si applichi da sé.
+const INATTIVITA_MS = 10 * 60_000;
 
 let mainWindow = null;
 let tray = null;
@@ -44,6 +47,15 @@ let interfacciaPronta = false;
 let rottaInAttesa = null;
 //: Aggiornamento scaricato e in attesa di essere applicato.
 let aggiornamentoPronto = false;
+//: Versione del pacchetto in arrivo, da mostrare a chi decide se applicarlo.
+let versioneScaricata = null;
+//: Ultimo stato dell'aggiornamento, conservato per chi lo chiede dopo.
+let statoAggiornamento = null;
+//: Sorveglia la finestra per applicare l'aggiornamento quando è nascosta.
+let timerInattivita = null;
+//: Il database condiviso è più avanti di questa versione: l'applicazione non
+//: lavora finché non si aggiorna.
+let postazioneIndietro = false;
 //: Misura dell'icona della tray su questo schermo: serve a ridisegnarla con e
 //: senza bollino senza ricalcolare ogni volta il fattore di scala.
 let dimensioneTray = 16;
@@ -123,19 +135,26 @@ function stopBackend() {
   }
 }
 
-/** Attende che il backend risponda prima di caricare l'interfaccia. */
+/**
+ * Attende che il backend risponda prima di caricare l'interfaccia.
+ *
+ * Ritorna quello che il backend ha detto di sé, non un semplice sì: nella
+ * risposta c'è anche se questa postazione è rimasta indietro rispetto al
+ * database condiviso, e quel dettaglio cambia come ci si comporta con
+ * l'aggiornamento. `null` se non si è fatto vivo in tempo.
+ */
 async function waitForBackend(timeoutMs = 60_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
       const res = await fetch(`${BASE_URL}/api/health`);
-      if (res.ok) return true;
+      if (res.ok) return await res.json();
     } catch {
       /* non ancora pronto */
     }
     await new Promise((r) => setTimeout(r, 500));
   }
-  return false;
+  return null;
 }
 
 // ---------------------------------------------------------------- finestra
@@ -561,6 +580,23 @@ function startPolling() {
 // --------------------------------------------------------- aggiornamenti
 
 /**
+ * Il modulo di aggiornamento, o `null` dove non ha senso averlo.
+ *
+ * In sviluppo e fuori dal pacchetto non esiste una release da cui aggiornarsi:
+ * qui si dice una volta sola, così il resto del file non deve ripetere il
+ * controllo e l'interfaccia può nascondere un pulsante che non funzionerebbe.
+ */
+function updater() {
+  if (DEV || !app.isPackaged) return null;
+  try {
+    return require('electron-updater').autoUpdater;
+  } catch (err) {
+    console.error('Aggiornamento non disponibile:', err);
+    return null;
+  }
+}
+
+/**
  * Applica l'aggiornamento già scaricato, chiudendo davvero l'applicazione.
  *
  * `quitAndInstall` passa dal ciclo di uscita normale, e la X di questa app non
@@ -568,42 +604,162 @@ function startPolling() {
  * di una chiusura che non arriva.
  */
 function installaAggiornamento() {
+  const auto = updater();
+  if (auto === null) return;
   try {
+    emettiStato({ fase: 'riavvio' });
     quitting = true;
-    require('electron-updater').autoUpdater.quitAndInstall();
+    auto.quitAndInstall();
   } catch (err) {
     console.error('Installazione aggiornamento fallita:', err);
     quitting = false;
+    emettiStato({ fase: 'errore', dettaglio: String(err && err.message ? err.message : err) });
   }
+}
+
+/**
+ * Racconta all'interfaccia a che punto è l'aggiornamento.
+ *
+ * L'ultimo stato si conserva perché la schermata può aprirsi *dopo* che
+ * qualcosa è già successo — il controllo all'avvio finisce prima che l'utente
+ * arrivi alla pagina — e senza memoria mostrerebbe un pulsante inerte accanto
+ * a un pacchetto già pronto.
+ */
+function emettiStato(stato) {
+  statoAggiornamento = stato;
+  if (mainWindow !== null && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('aggiornamento-stato', stato);
+  }
+}
+
+/**
+ * Cerca un aggiornamento adesso, senza aspettare il giro dell'ora.
+ *
+ * Ritorna lo stato raggiunto, così chi ha premuto il pulsante riceve una
+ * risposta anche quando non c'è niente da scaricare: un pulsante che non dice
+ * nulla è indistinguibile da un pulsante rotto.
+ */
+async function cercaAggiornamento() {
+  const auto = updater();
+  if (auto === null) return { fase: 'non-disponibile' };
+  if (aggiornamentoPronto) return { fase: 'pronto', versione: versioneScaricata };
+
+  try {
+    const esito = await auto.checkForUpdates();
+    // `checkForUpdates` risolve appena il controllo è finito, non a scaricamento
+    // concluso: da qui in poi la strada passa dagli eventi, e lo stato corrente
+    // è quello che hanno appena scritto.
+    if (esito === null) return { fase: 'nessuno' };
+    return statoAggiornamento || { fase: 'controllo' };
+  } catch (err) {
+    console.error('Controllo aggiornamenti fallito:', err);
+    const stato = { fase: 'errore', dettaglio: String(err && err.message ? err.message : err) };
+    emettiStato(stato);
+    return stato;
+  }
+}
+
+/**
+ * Applica l'aggiornamento da sé quando nessuno sta guardando.
+ *
+ * L'installazione alla chiusura da sola non basta: l'applicazione vive nella
+ * tray e su molte postazioni non viene mai chiusa davvero, così la versione
+ * nuova resta scaricata e mai applicata per settimane. Con un database
+ * condiviso questo si paga caro — appena una postazione applica una migrazione,
+ * quelle rimaste indietro non riescono più a collegarsi.
+ *
+ * Il riavvio si prende solo a finestra chiusa o nascosta da un po': con la
+ * finestra davanti spegnerebbe il lavoro di qualcuno a metà, e quello è il caso
+ * in cui esiste il pulsante.
+ *
+ * L'attesa si accorcia sulle postazioni rimaste indietro: lì non c'è nessun
+ * lavoro da interrompere — l'applicazione non si collega — e ogni minuto in
+ * più è un minuto in cui quel computer non serve a niente.
+ */
+function installaQuandoInattiva() {
+  if (timerInattivita !== null) return;
+
+  const attesa = postazioneIndietro ? 60_000 : INATTIVITA_MS;
+  let nascostaDa = null;
+  timerInattivita = setInterval(() => {
+    const visibile = mainWindow !== null && !mainWindow.isDestroyed() && mainWindow.isVisible();
+    if (visibile) {
+      nascostaDa = null;
+      return;
+    }
+    if (nascostaDa === null) {
+      nascostaDa = Date.now();
+      return;
+    }
+    if (Date.now() - nascostaDa >= attesa) {
+      clearInterval(timerInattivita);
+      timerInattivita = null;
+      console.log('Aggiornamento applicato a finestra nascosta');
+      installaAggiornamento();
+    }
+    // Mezzo minuto: la sorveglianza deve essere più fitta della più breve
+    // delle due attese, altrimenti «un minuto» ne diventa due.
+  }, 30_000);
 }
 
 function setupUpdater() {
-  if (DEV || !app.isPackaged) return;
-  try {
-    const { autoUpdater } = require('electron-updater');
-    autoUpdater.on('update-downloaded', () => {
-      // L'installazione alla chiusura da sola non basta: l'applicazione vive
-      // nella tray e su molte postazioni non viene mai chiusa davvero, così la
-      // versione nuova resta scaricata e mai applicata per settimane. Con un
-      // database condiviso questo si paga: appena una postazione applica una
-      // migrazione, quelle rimaste indietro non riescono più a collegarsi.
-      aggiornamentoPronto = true;
-      if (tray) tray.setContextMenu(menuTray());
+  const auto = updater();
+  if (auto === null) return;
 
-      const avviso = new Notification({
-        title: 'Aggiornamento di Promemoria pronto',
-        body: 'Clicca qui per riavviare e applicarlo adesso, oppure verrà installato alla prossima chiusura.',
-      });
-      avviso.on('click', () => installaAggiornamento());
-      avviso.show();
+  auto.on('checking-for-update', () => emettiStato({ fase: 'controllo' }));
+  auto.on('update-not-available', () => emettiStato({ fase: 'nessuno' }));
+  auto.on('update-available', (info) => {
+    versioneScaricata = info && info.version;
+    emettiStato({ fase: 'scaricamento', versione: versioneScaricata, percento: 0 });
+  });
+  auto.on('download-progress', (avanzamento) =>
+    emettiStato({
+      fase: 'scaricamento',
+      versione: versioneScaricata,
+      percento: Math.round(avanzamento.percent),
+    }),
+  );
+  auto.on('error', (err) =>
+    emettiStato({ fase: 'errore', dettaglio: String(err && err.message ? err.message : err) }),
+  );
+
+  auto.on('update-downloaded', (info) => {
+    aggiornamentoPronto = true;
+    versioneScaricata = info && info.version;
+    if (tray) tray.setContextMenu(menuTray());
+    emettiStato({ fase: 'pronto', versione: versioneScaricata });
+    installaQuandoInattiva();
+
+    const avviso = new Notification({
+      title: 'Aggiornamento di Promemoria pronto',
+      body: 'Clicca qui per riavviare e applicarlo adesso, oppure verrà applicato da sé a finestra chiusa.',
     });
-    autoUpdater.checkForUpdatesAndNotify();
-    // Ricontrolla una volta al giorno per le installazioni sempre aperte.
-    setInterval(() => autoUpdater.checkForUpdatesAndNotify(), 24 * 60 * 60 * 1000);
-  } catch (err) {
-    console.error('Aggiornamento non disponibile:', err);
-  }
+    avviso.on('click', () => installaAggiornamento());
+    avviso.show();
+  });
+
+  void cercaAggiornamento();
+  // Ogni ora, non una volta al giorno: fra un aggiornamento e il successivo di
+  // una postazione rimasta indietro passa il tempo in cui il database condiviso
+  // è già avanti e quella postazione non lavora.
+  setInterval(() => void cercaAggiornamento(), 60 * 60 * 1000);
 }
+
+// L'interfaccia chiede lo stato appena si apre la schermata di configurazione:
+// il controllo all'avvio è già finito da un pezzo e nessun evento arriverebbe.
+ipcMain.handle('aggiornamento-stato', () => ({
+  disponibile: updater() !== null,
+  versioneCorrente: app.getVersion(),
+  stato: statoAggiornamento,
+}));
+
+ipcMain.handle('aggiornamento-avvia', async () => {
+  if (aggiornamentoPronto) {
+    installaAggiornamento();
+    return { fase: 'riavvio' };
+  }
+  return cercaAggiornamento();
+});
 
 // ------------------------------------------------------------ ciclo vita
 
@@ -630,7 +786,14 @@ app.whenReady().then(async () => {
   startBackend();
   createTray();
   await svuotaCacheSeVersioneCambiata();
-  await waitForBackend();
+  const salute = await waitForBackend();
+  if (salute && salute.schema_ahead) {
+    // Da qui l'applicazione non lavora: il database condiviso è già stato
+    // migrato da una postazione più aggiornata. Va detto nel log, perché è la
+    // prima cosa da guardare quando un PC "non funziona più".
+    postazioneIndietro = true;
+    console.log('Postazione indietro: il database condiviso richiede una versione più recente');
+  }
   createWindow();
 
   // L'app potrebbe essere stata avviata proprio dal clic su una notifica,

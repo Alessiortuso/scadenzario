@@ -52,6 +52,13 @@ shared_engine: Engine | None = None
 #: per niente — è successo davvero, su tutte le postazioni in una volta.
 shared_error: str | None = None
 
+#: Lo stesso guasto in forma di codice, quando l'errore ne porta uno. Il testo
+#: si legge, questo si confronta: `schema_piu_recente` è la sola condizione che
+#: la postazione può risolvere da sola, aggiornandosi, e va distinta da un
+#: database irraggiungibile o da credenziali sbagliate — dove il pulsante
+#: «Aggiorna» non servirebbe a niente.
+shared_error_code: str | None = None
+
 
 class Base(DeclarativeBase):
     """Tabelle del database condiviso."""
@@ -63,7 +70,7 @@ class LocalBase(DeclarativeBase):
 
 def configure_shared(url: str, *, migrate: bool = False) -> Engine:
     """Collega (o ricollega) il database condiviso all'URL indicato."""
-    global shared_engine, shared_error
+    global shared_engine, shared_error, shared_error_code
 
     engine = _make_engine(url)
 
@@ -74,11 +81,13 @@ def configure_shared(url: str, *, migrate: bool = False) -> Engine:
             migrations.upgrade(engine, "shared")
         except Exception as exc:
             shared_error = str(exc).splitlines()[0]
+            shared_error_code = getattr(exc, "codice", None)
             raise
 
     SharedSession.configure(bind=engine)
     shared_engine = engine
     shared_error = None
+    shared_error_code = None
     return engine
 
 

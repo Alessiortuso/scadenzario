@@ -40,6 +40,11 @@ def test_revisione_sconosciuta_lo_dice_con_parole_utili():
     assert "9999" in messaggio
     assert "Aggiorna Promemoria" in messaggio
 
+    # Il codice è quello su cui la schermata di configurazione decide se
+    # mostrare il pulsante che aggiorna sul posto: cambiarlo qui senza
+    # cambiarlo là lascerebbe l'utente davanti al solo messaggio, di nuovo.
+    assert errore.value.codice == "schema_piu_recente"
+
 
 def test_database_allineato_non_fa_nulla():
     engine = _engine()
