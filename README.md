@@ -203,6 +203,31 @@ Per riesaminare una release già pubblicata, senza pubblicare niente:
 .\scripts\release.ps1 -Version 1.0.2 -VerifyOnly
 ```
 
+### Se la compilazione si ferma con `spawn UNKNOWN`
+
+Sintomo: electron-builder arriva a `building target=nsis`, stampa una riga `signing with signtool.exe`, e muore con `spawn UNKNOWN` dentro `NsisTarget.computeScriptAndSignUninstaller`.
+
+La riga sulla firma è un depistaggio — gira in parallelo e non c'entra. La chiamata che fallisce **esegue l'installer appena costruito**, perché è l'installer stesso a generare il proprio disinstallatore. Windows si rifiuta di lanciarlo: un eseguibile NSIS appena scritto e non firmato è esattamente ciò che la protezione in tempo reale di Defender blocca. Il file c'è sul disco, e questo rende il sintomo ingannevole: sembra un percorso sbagliato, non un divieto.
+
+Il rimedio è escludere la sola cartella di compilazione, da una finestra **con permessi di amministratore**:
+
+```powershell
+Add-MpPreference -ExclusionPath "<percorso del progetto>\desktop\release"
+```
+
+Si toglie con `Remove-MpPreference -ExclusionPath`. Vale la pena rifare il controllo dopo un aggiornamento di Windows, che le esclusioni le ha già azzerate.
+
+Un secondo inciampo si presenta insieme al primo e va distinto, perché il messaggio è simile ma la causa no: l'archivio `winCodeSign` che electron-builder scarica contiene due link simbolici per macOS, e crearli su Windows richiede un privilegio che un utente normale non ha. L'estrazione si interrompe, la cartella resta a metà e `signtool.exe` non esiste davvero. Qui l'errore è genuinamente un file mancante. Per rimediare basta chiedere la stessa estrazione una seconda volta, che arriva in fondo tollerando i due link:
+
+```powershell
+cd desktop
+node -e "require('./node_modules/app-builder-lib/out/toolsets/windows.js').getSignToolPath(undefined,true).then(r=>console.log(r.path, require('fs').existsSync(r.path)))"
+```
+
+Deve stampare un percorso e `true`.
+
+Ultima avvertenza, sul metodo più che sullo strumento: **non incanalare l'output dello script con `2>&1`**. PowerShell 5.1 avvolge in un errore ogni riga che un eseguibile scrive su stderr, e PyInstaller ci scrive il suo normale avanzamento: lo script sembra fallito al passo 5 quando non è successo niente.
+
 ## Avvio — applicazione desktop (sviluppo)
 
 ```powershell
